@@ -8,6 +8,7 @@ using real_t = sunrealtype;
 #include <limits>
 #include <iomanip>
 #include <sstream>
+#include <functional>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
@@ -27,7 +28,7 @@ private:
     static std::shared_ptr<spdlog::logger> s_Logger;
 };
 
-} // namespace Spectra
+} // namespace CMF
 
 #define LOG_TRACE(...)    ::CMF::Log::getLogger()->trace(__VA_ARGS__)
 #define LOG_INFO(...)     ::CMF::Log::getLogger()->info(__VA_ARGS__)

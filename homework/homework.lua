@@ -20,8 +20,13 @@ project "Homework"
         "%{Include.sundials}",
         "%{Include.eigen}",
     }
-    
-    links {}
+
+    links {
+        "%{Library.sundials_sunmatrixdense}",
+        "%{Library.sundials_sunlinsoldense}",
+        "%{Library.sundials_nvecserial}",
+        "%{Library.sundials_core}",
+    }
 
     filter "system:linux"
         linkoptions { "-Wl,-rpath,'$$ORIGIN/lib'" }
