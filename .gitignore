@@ -30,3 +30,32 @@
 *.exe
 *.out
 *.app
+
+# Build directories
+**/bin/
+**/bin-int/
+**/build/
+
+# Install directories
+**/install/
+
+# Premake generated files
+Makefile
+*.make
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# VSCode
+.vscode/
+
+# Logging files
+*.log
+
+# Other shell scripts
+scripts/spBuildAndRun.sh
+
+# Python virtual environment
+**/venv/
