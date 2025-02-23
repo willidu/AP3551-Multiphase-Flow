@@ -1,3 +1,6 @@
 [submodule "external/sundials"]
 	path = external/sundials
 	url = git@github.com:LLNL/sundials.git
+[submodule "external/spdlog"]
+	path = external/spdlog
+	url = git@github.com:gabime/spdlog.git
