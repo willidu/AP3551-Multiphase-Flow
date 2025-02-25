@@ -32,7 +32,8 @@ enum class GlobalBC { PressureGradient, FlowRate };
 
 struct BC
 {
-    std::pair<WallBC, real_t> wall;
+    std::pair<WallBC, real_t> lowerWall;
+    std::pair<WallBC, real_t> upperWall;
     std::pair<GlobalBC, real_t> global;
 };
 
