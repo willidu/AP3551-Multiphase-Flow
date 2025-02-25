@@ -19,6 +19,11 @@ project "Homework"
         "%{Include.spdlog}",
         "%{Include.sundials}",
         "%{Include.eigen}",
+        "%{Include.matplotlib_cpp}",
+    }
+
+    externalincludedirs {
+        "%{Include.python}",
     }
 
     links {
@@ -26,6 +31,7 @@ project "Homework"
         "%{Library.sundials_sunlinsoldense}",
         "%{Library.sundials_nvecserial}",
         "%{Library.sundials_core}",
+        "%{Library.python}",
     }
 
     filter "system:linux"

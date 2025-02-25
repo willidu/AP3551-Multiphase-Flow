@@ -11,12 +11,17 @@ eigen = core_ext .. "/eigen"
 -- spdlog
 spdlog = core_ext .. "/spdlog"
 
+-- matplotlib-c++
+plt = core_ext .. "/matplotlib-cpp"
+
 -------------------------------------------------------------------------------
 Include = {}
 
 Include["sundials"] = sundials .. "/include"
 Include["eigen"] = eigen
 Include["spdlog"] = spdlog .. "/include"
+Include["matplotlib_cpp"] = plt
+Include["python"] = "/usr/include/python3.12"
 
 -------------------------------------------------------------------------------
 Library = {}
@@ -31,3 +36,5 @@ Library["sundials_sunlinsolband"] = sundials .. "/lib/sundials_sunlinsolband"
 Library["sundials_sunnonlinsolfixedpoint"] = sundials .. "/lib/sundials_sunnonlinsolfixedpoint"
 Library["sundials_sunnonlinsolnewton"] = sundials .. "/lib/sundials_sunnonlinsolnewton"
 Library["sundials_sunmatrixdense"] = sundials .. "/lib/sundials_sunmatrixdense"
+
+Library["python"] = "/usr/lib/python3.12"

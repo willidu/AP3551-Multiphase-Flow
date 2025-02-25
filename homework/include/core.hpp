@@ -13,6 +13,12 @@ using real_t = sunrealtype;
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 
+#ifndef WITHOUT_NUMPY
+    #define WITHOUT_NUMPY
+#endif
+#include <matplotlibcpp.h>
+namespace plt = matplotlibcpp;
+
 
 namespace CMF
 {

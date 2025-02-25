@@ -7,3 +7,6 @@
 [submodule "external/eigen"]
 	path = external/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "external/matplotlib-cpp"]
+	path = external/matplotlib-cpp
+	url = git@github.com:lava/matplotlib-cpp.git
