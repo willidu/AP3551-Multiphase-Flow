@@ -34,6 +34,8 @@ private:
     static std::shared_ptr<spdlog::logger> s_Logger;
 };
 
+std::vector<real_t> channelMesh1D(size_t N, real_t H, real_t s = 1.0);
+
 } // namespace CMF
 
 #define LOG_TRACE(...)    ::CMF::Log::getLogger()->trace(__VA_ARGS__)
