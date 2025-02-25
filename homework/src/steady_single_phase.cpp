@@ -11,6 +11,34 @@ namespace CMF
 namespace T1
 {
 
+bool validEntry(
+    const std::vector<real_t>& mesh,
+    const std::function<real_t(real_t)>& viscosity,
+    const BC& bc)
+{
+    if (mesh.size() < 3)
+    {
+        LOG_ERROR("Mesh must have at least 3 nodes");
+        return false;
+    }
+
+    if (bc.global.first != GlobalBC::PressureGradient)
+    {
+        LOG_ERROR("Only PressureGradient BC is supported");
+        return false;
+    }
+
+    if (bc.lowerWall.first == WallBC::VelocityGradient
+        && bc.upperWall.first == WallBC::VelocityGradient)
+    {
+        LOG_ERROR("Both walls cannot have VelocityGradient BC");
+        return false;
+    }
+
+    return true;
+}
+
+
 void fillSystem(
     SUNMatrix A,
     N_Vector b,
@@ -113,12 +141,13 @@ std::vector<real_t> steadyChannelFlow(
     BC bc
 )
 {
-    if (bc.global.first != GlobalBC::PressureGradient)
+    if (!validEntry(mesh, viscosity, bc))
     {
-        const char* msg = "Only PressureGradient BC is supported";
+        const char* msg = "Invalid input";
         LOG_ERROR(msg);
         throw std::runtime_error(msg);
     }
+
     const size_t N = mesh.size();
 
     // Step 1: Create the SUNContext
