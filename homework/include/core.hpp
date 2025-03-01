@@ -1,6 +1,9 @@
 #pragma once
 
 #include <sundials/sundials_types.h>
+#include <nvector/nvector_serial.h>
+#include <sundials/sundials_matrix.h>
+#include <sunlinsol/sunlinsol_dense.h>
 
 using real_t = sunrealtype;
 
@@ -32,6 +35,30 @@ public:
 
 private:
     static std::shared_ptr<spdlog::logger> s_Logger;
+};
+
+
+// Solver for the linear system Au = b
+class LinearSolver
+{
+public:
+    LinearSolver(size_t N);
+    ~LinearSolver();
+
+    [[nodiscard]] inline SUNMatrix Matrix() noexcept { return m_Matrix;   }
+    [[nodiscard]] inline N_Vector  RHS()    noexcept { return m_RHS;      }
+    [[nodiscard]] inline N_Vector  SolVec() noexcept { return m_Solution; }
+    [[nodiscard]] std::vector<real_t> getSolutionVector() const;
+
+    void solve(real_t tol = 1e-10);
+
+private:
+    const size_t m_Vars;
+    SUNContext m_Context;
+    SUNMatrix m_Matrix;
+    SUNLinearSolver m_Solver;
+    N_Vector m_RHS;
+    N_Vector m_Solution;
 };
 
 std::vector<real_t> channelMesh1D(size_t N, real_t H, real_t s = 1.0);

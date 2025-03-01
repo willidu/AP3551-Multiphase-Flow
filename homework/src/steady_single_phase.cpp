@@ -1,9 +1,5 @@
 #include "steady_single_phase.hpp"
 
-#include <sundials/sundials_context.h>
-#include <nvector/nvector_serial.h>
-#include <sundials/sundials_matrix.h>
-#include <sunlinsol/sunlinsol_dense.h>
 
 namespace CMF
 {
@@ -149,41 +145,12 @@ std::vector<real_t> steadyChannelFlow(
     }
 
     const size_t N = mesh.size();
+    LinearSolver solver(N);
 
-    // Step 1: Create the SUNContext
-    SUNContext sunctx;
-    if (SUNContext_Create(SUN_COMM_NULL, &sunctx))
-    {
-        const char* msg = "Failed to create SUNContext";
-        LOG_ERROR(msg);
-        throw std::runtime_error(msg);
-    }
-
-    // Step 2: Create dense matrix and RHS vector
-    SUNMatrix A = SUNDenseMatrix(N, N, sunctx);
-    N_Vector b = N_VNew_Serial(N, sunctx);
-    N_Vector u = N_VNew_Serial(N, sunctx);
-
-    // Step 3: Fill system matrix and RHS vector
-    fillSystem(A, b, mesh, viscosity, bc);
-
-    // Step 3: Solve the system using SUNLINSOL_DENSE
-    SUNLinearSolver LS = SUNLinSol_Dense(u, A, sunctx);
-    SUNLinSolSetup(LS, A);
-    SUNLinSolSolve(LS, A, u, b, 1e-10);
-
-    // Step 4: Copy solution to std::vector
-    const real_t* u_data = N_VGetArrayPointer_Serial(u);
-    const std::vector<real_t> u_result(u_data, u_data + N);
-
-    // Step 5: Cleanup
-    SUNLinSolFree(LS);
-    SUNMatDestroy(A);
-    N_VDestroy(b);
-    N_VDestroy(u);
-    SUNContext_Free(&sunctx);
-
-    return u_result;
+    fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity, bc);
+    
+    solver.solve();
+    return solver.getSolutionVector();
 }
 
 } // namespace T1
