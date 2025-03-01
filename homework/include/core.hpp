@@ -39,6 +39,7 @@ private:
 
 
 // Solver for the linear system Au = b
+// Currently the solver does not support restarts
 class LinearSolver
 {
 public:

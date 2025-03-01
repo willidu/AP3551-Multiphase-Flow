@@ -24,9 +24,6 @@ namespace CMF
 //   (ii) prescribed flow-rate.
 // ****************************************************************************
 
-namespace T1
-{
-
 enum class WallBC   { Velocity, VelocityGradient, ShearStressRelation };
 enum class GlobalBC { PressureGradient, FlowRate };
 
@@ -37,11 +34,37 @@ struct BC
     std::pair<GlobalBC, real_t> global;
 };
 
+/**
+ * Find the velocity field in a steady fully-developed single-phase channel flow
+ * with variable viscosity. The viscosity profile is a prescribed input to the
+ * routine.
+ */
 std::vector<real_t> steadyChannelFlow(
     const std::vector<real_t>& mesh,
     std::function<real_t(real_t)> viscosity,
     BC bc
 );
 
-} // namespace T1
+// ****************************************************************************
+//                                    TASK 2
+// ****************************************************************************
+// Develop a routine to compute the eddy-viscosity Prandtl mixing-length model,
+// with prescribed functions for the mixing-length (try different functions).
+// Incorporate this routine into the channel flow code.
+// ****************************************************************************
+
+/**
+ * Find the velocity field in a steady fully-developed single-phase channel flow
+ * with variable viscosity and mixing length. The viscosity profile is a prescribed
+ * input to the routine. The mixing length is used to compute the eddy viscosity.
+ */
+std::vector<real_t> steadyChannelFlow(
+    const std::vector<real_t>& mesh,
+    std::function<real_t(real_t)> viscosity,
+    std::function<real_t(real_t)> mixingLength,
+    BC bc,
+    size_t maxIter = 500,
+    real_t tol = 1e-6
+);
+
 } // namespace CMF

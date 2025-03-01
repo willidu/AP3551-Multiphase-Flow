@@ -4,9 +4,6 @@
 namespace CMF
 {
 
-namespace T1
-{
-
 bool validEntry(
     const std::vector<real_t>& mesh,
     const std::function<real_t(real_t)>& viscosity,
@@ -152,5 +149,106 @@ std::vector<real_t> steadyChannelFlow(
     return solver.getSolutionVector();
 }
 
-} // namespace T1
+
+size_t findIndex(
+    const std::vector<real_t>& mesh,
+    real_t y
+)
+{
+    const auto it = std::lower_bound(mesh.begin(), mesh.end(), y);
+
+    if (it == mesh.end())
+        return mesh.size() - 1;
+
+    if (it == mesh.begin())
+        return 0;
+
+    return std::distance(mesh.begin(), it);
+}
+
+
+real_t velocityGradient(
+    const std::vector<real_t>& mesh,
+    const std::vector<real_t>& u,
+    size_t i
+)
+{
+    if (i == 0)
+        return (u.at(1) - u.at(0)) / (mesh.at(1) - mesh.at(0));
+    
+    if (i == mesh.size() - 1)
+        return (u.at(i) - u.at(i-1)) / (mesh.at(i) - mesh.at(i-1));
+
+    return (u.at(i+1) - u.at(i-1)) / (mesh.at(i+1) - mesh.at(i-1));
+}
+
+
+std::vector<real_t> steadyChannelFlow(
+    const std::vector<real_t>& mesh,
+    std::function<real_t(real_t)> viscosity_mol,
+    std::function<real_t(real_t)> mixingLength,
+    BC bc,
+    size_t maxIter,
+    real_t tol
+)
+{
+    if (!validEntry(mesh, viscosity_mol, bc))
+    {
+        const char* msg = "Invalid input";
+        LOG_ERROR(msg);
+        throw std::runtime_error(msg);
+    }
+
+    const size_t N = mesh.size();
+
+    // We will fist assume that the eddy viscosity is zero
+    std::vector<real_t> u;
+    {
+        LinearSolver solver(N);
+        fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity_mol, bc);
+        solver.solve();
+        u = solver.getSolutionVector();
+    }
+
+    // We will now iterate to find a solution with non-zero eddy viscosity
+    for (size_t iter = 0; iter < maxIter; ++iter)
+    {
+        LinearSolver solver(N);
+        std::function<real_t(real_t)> viscosity = [&](real_t y) -> real_t
+        {
+            const real_t mu_mol = viscosity_mol(y);
+            const size_t i = findIndex(mesh, y);
+            const real_t dudy = velocityGradient(mesh, u, i);
+            const real_t mu_t = std::pow(mixingLength(y), 2.0) * std::abs(dudy);
+
+            return mu_mol + mu_t;
+        };
+
+        fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity, bc);
+        solver.solve();
+        std::vector<real_t> u_new = solver.getSolutionVector();
+
+        // Convergence with L2 norm
+        const real_t error = std::sqrt(std::inner_product(
+            u.begin(), u.end(), u_new.begin(), 0.0, std::plus<real_t>(),
+            [](real_t a, real_t b) { return std::pow(a - b, 2.0); }
+        ));
+
+        u = u_new;
+
+        if (error < tol)
+        {
+            LOG_INFO("Converged after {0} iterations", iter);
+            break;
+        }
+
+        if (iter == maxIter - 1)
+        {
+            LOG_WARN("Did not converge after {0} iterations", maxIter);
+        }
+    }
+
+    return u;
+}
+
 } // namespace CMF

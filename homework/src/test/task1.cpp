@@ -3,9 +3,6 @@
 namespace CMF
 {
 
-namespace T1
-{
-
 void givenDP_givenWallVel()
 {
     LOG_INFO("Running test code for Task 1 with prescribed pressure gradients.");
@@ -91,5 +88,4 @@ void givenDP_givenWallVel()
     plt::show();
 }
 
-} // namespace T1
 } // namespace CMF

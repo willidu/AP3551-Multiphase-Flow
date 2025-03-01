@@ -7,6 +7,9 @@ int main()
     LOG_TRACE("Program started!");
 
     // Test for Task 1
-    CMF::T1::givenDP_givenWallVel();
+    CMF::givenDP_givenWallVel();
+
+    // Test for Task 2
+    CMF::testMixingLength();
 
 }
