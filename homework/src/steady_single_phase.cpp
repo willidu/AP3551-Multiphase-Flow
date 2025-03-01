@@ -42,7 +42,6 @@ void fillSystem(
     const std::function<real_t(real_t)>& viscosity,
     const BC& bc)
 {
-    // TODO: Check signs of the forcing terms
     // TODO: Check indexes (i, i+1/2, i-1/2 etc.)
 
     const size_t N = mesh.size();
@@ -57,12 +56,12 @@ void fillSystem(
         const real_t mu_ip = viscosity((mesh.at(i) + mesh.at(i+1)) / 2);
         const real_t mu_im = viscosity((mesh.at(i) + mesh.at(i-1)) / 2);
 
-        SM_ELEMENT_D(A, i, i - 1) = -mu_im / (dy_b * dy);
-        SM_ELEMENT_D(A, i, i)     =  mu_ip / (dy_f * dy)
-                                  +  mu_im / (dy_b * dy);
-        SM_ELEMENT_D(A, i, i + 1) = -mu_ip / (dy_f * dy);
+        SM_ELEMENT_D(A, i, i - 1) = + mu_im / (dy_b * dy);
+        SM_ELEMENT_D(A, i, i)     = - mu_ip / (dy_f * dy)
+                                    - mu_im / (dy_b * dy);
+        SM_ELEMENT_D(A, i, i + 1) = + mu_ip / (dy_f * dy);
 
-        NV_Ith_S(b, i) = -bc.global.second;  // Forcing term
+        NV_Ith_S(b, i) = bc.global.second;
     }
 
     switch (bc.lowerWall.first)
@@ -85,7 +84,7 @@ void fillSystem(
             SM_ELEMENT_D(A, 0, 0) = 2 * mu0 / (dy * dy);
             SM_ELEMENT_D(A, 0, 1) = -2 * mu0 / (dy * dy);
             NV_Ith_S(b, 0) = bc.global.second
-                           + bc.lowerWall.second / dy;
+                           - bc.lowerWall.second / dy;
             break;
         }
 
@@ -117,7 +116,7 @@ void fillSystem(
             SM_ELEMENT_D(A, N - 1, N - 2) = -2 * muN / (dy * dy);
             SM_ELEMENT_D(A, N - 1, N - 1) = 2 * muN / (dy * dy);
             NV_Ith_S(b, N - 1) = bc.global.second
-                               + bc.upperWall.second / dy;
+                               - bc.upperWall.second / dy;
             break;
         }
 

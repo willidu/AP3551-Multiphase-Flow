@@ -63,7 +63,7 @@ void givenDP_givenWallVel()
 
     result = steadyChannelFlow(
         mesh, [](real_t y) {return 1e-3; },
-        {{WallBC::VelocityGradient, -0.5}, {WallBC::Velocity, 2.0}, {GlobalBC::PressureGradient, -10.0}}
+        {{WallBC::VelocityGradient, 0.5}, {WallBC::Velocity, 2.0}, {GlobalBC::PressureGradient, -10.0}}
     );
 
     plt::figure();
