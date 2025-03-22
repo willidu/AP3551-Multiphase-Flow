@@ -5,6 +5,7 @@ namespace CMF
 
 void testWallFunction()
 {
+    #if 0
     /* TEST CASES
      * 1. Laminar flow
      * 2. Mixing length without damping
@@ -85,6 +86,7 @@ void testWallFunction()
     plt::show();
 
     LOG_INFO("Test code for Task 3 finished.");
+    #endif
 }
 
 } // namespace CMF

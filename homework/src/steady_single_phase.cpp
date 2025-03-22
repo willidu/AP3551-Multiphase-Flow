@@ -5,7 +5,7 @@ namespace CMF
 {
 
 bool validEntry(
-    const std::vector<real_t>& mesh,
+    const Mesh& mesh,
     const BC& bc)
 {
     if (mesh.size() < 3)
@@ -34,53 +34,61 @@ bool validEntry(
 void fillSystem(
     SUNMatrix A,
     N_Vector b,
-    const std::vector<real_t>& mesh,
-    const std::function<real_t(real_t)>& viscosity,
+    const Mesh& mesh,
     const BC& bc)
 {
-    // TODO: Check indexes (i, i+1/2, i-1/2 etc.)
-
-    const size_t N = mesh.size();
-
-    for (size_t i = 1; i < N - 1; ++i)
+    for (size_t i = 1; i < mesh.size() - 1; ++i)
     {
-        // Forward and backward spacing
-        const real_t dy_f = mesh.at(i+1) - mesh.at(i);
-        const real_t dy_b = mesh.at(i) - mesh.at(i-1);
-        const real_t dy = (dy_f + dy_b) / 2.0;
+        const auto& P = mesh[i];    // Center
+        const auto& N = mesh[i+1];  // North
+        const auto& S = mesh[i-1];  // South
 
-        const real_t mu_ip = viscosity((mesh.at(i) + mesh.at(i+1)) / 2);
-        const real_t mu_im = viscosity((mesh.at(i) + mesh.at(i-1)) / 2);
+        // Linear interpolation of viscosity at faces
+        const real_t mu_n = (1.0 - P.width / N.width) * P.viscosity
+                                 + P.width / N.width  * N.viscosity;
+        const real_t mu_s = (1.0 - P.width / S.width) * P.viscosity
+                                 + P.width / S.width  * S.viscosity;
 
-        SM_ELEMENT_D(A, i, i - 1) = + mu_im / (dy_b * dy);
-        SM_ELEMENT_D(A, i, i)     = - mu_ip / (dy_f * dy)
-                                    - mu_im / (dy_b * dy);
-        SM_ELEMENT_D(A, i, i + 1) = + mu_ip / (dy_f * dy);
+        SM_ELEMENT_D(A, i, i + 1) = + mu_n * 2.0 / (P.width + N.width);
+        SM_ELEMENT_D(A, i, i)     = - mu_n * 2.0 / (P.width + N.width)
+                                    - mu_s * 2.0 / (P.width + S.width);
+        SM_ELEMENT_D(A, i, i - 1) = + mu_s * 2.0 / (P.width + S.width);
 
-        NV_Ith_S(b, i) = bc.global.second;
+        NV_Ith_S(b, i) = bc.global.second * P.width;
     }
 
     switch (bc.lowerWall.first)
     {
         case WallBC::Velocity:
         {
-            const real_t dy = mesh.at(1) - mesh.at(0);
-            const real_t mu0 = viscosity(mesh.at(0) + dy / 2.0);
-            SM_ELEMENT_D(A, 0, 0) = 3 * mu0 / (dy * dy);
-            SM_ELEMENT_D(A, 0, 1) = -mu0 / (dy * dy);
-            NV_Ith_S(b, 0) = bc.global.second 
-                           + (2 * mu0 * bc.lowerWall.second / (dy * dy));
+            const auto& P = mesh[0];
+            const auto& N = mesh[1];
+
+            const real_t mu_n = (1.0 - P.width / N.width) * P.viscosity
+                                     + P.width / N.width  * N.viscosity;
+            const real_t mu_s = P.viscosity; // TODO - Double check
+
+            SM_ELEMENT_D(A, 0, 0) = + 2.0 * mu_n / (P.width + N.width)
+                                    + 2.0 * mu_s / (P.width);
+            SM_ELEMENT_D(A, 0, 1) = - 2.0 * mu_n / (P.width + N.width);
+            NV_Ith_S(b, 0) = bc.global.second * P.width
+                           + 2.0 * mu_s * bc.lowerWall.second / P.width;
             break;
         }
 
         case WallBC::VelocityGradient:
         {
-            const real_t dy = mesh.at(1) - mesh.at(0);
-            const real_t mu0 = viscosity(mesh.at(0) + dy / 2.0);
-            SM_ELEMENT_D(A, 0, 0) = 2 * mu0 / (dy * dy);
-            SM_ELEMENT_D(A, 0, 1) = -2 * mu0 / (dy * dy);
-            NV_Ith_S(b, 0) = bc.global.second
-                           - bc.lowerWall.second / dy;
+            const auto& P = mesh[0];
+            const auto& N = mesh[1];
+
+            const real_t mu_n = (1.0 - P.width / N.width) * P.viscosity
+                                     + P.width / N.width  * N.viscosity;
+            const real_t mu_s = P.viscosity; // TODO - Double check
+
+            SM_ELEMENT_D(A, 0, 0) = - 2.0 * mu_n / (P.width + N.width);
+            SM_ELEMENT_D(A, 0, 1) = + 2.0 * mu_n / (P.width + N.width);
+            NV_Ith_S(b, 0) = bc.global.second * P.width
+                           + 2.0 * mu_s * bc.lowerWall.second / P.width;
             break;
         }
 
@@ -96,23 +104,36 @@ void fillSystem(
     {
         case WallBC::Velocity:
         {
-            const real_t dy = mesh.at(N-1) - mesh.at(N-2);
-            const real_t muN = viscosity(mesh.at(N-1) - dy / 2.0);
-            SM_ELEMENT_D(A, N - 1, N - 2) = -muN / (dy * dy);
-            SM_ELEMENT_D(A, N - 1, N - 1) = 3 * muN / (dy * dy);
-            NV_Ith_S(b, N - 1) = bc.global.second
-                               + (2 * muN * bc.upperWall.second / (dy * dy));
+            const size_t N = mesh.size() - 1;
+            const auto& P = mesh[N];
+            const auto& S = mesh[N - 1];
+
+            const real_t mu_n = P.viscosity; // TODO - Double check
+            const real_t mu_s = (1.0 - P.width / S.width) * P.viscosity
+                                     + P.width / S.width  * S.viscosity;
+
+            SM_ELEMENT_D(A, N, N)   = + 2.0 * mu_n / (P.width)
+                                      + 2.0 * mu_s / (P.width + S.width);
+            SM_ELEMENT_D(A, N, N-1) = - 2.0 * mu_s / (P.width + S.width);
+            NV_Ith_S(b, N) = bc.global.second * P.width
+                           + 2.0 * mu_n * bc.upperWall.second / P.width;
             break;
         }
 
         case WallBC::VelocityGradient:
         {
-            const real_t dy = mesh.at(N-1) - mesh.at(N-2);
-            const real_t muN = viscosity(mesh.at(N-1) - dy / 2.0);
-            SM_ELEMENT_D(A, N - 1, N - 2) = -2 * muN / (dy * dy);
-            SM_ELEMENT_D(A, N - 1, N - 1) = 2 * muN / (dy * dy);
-            NV_Ith_S(b, N - 1) = bc.global.second
-                               - bc.upperWall.second / dy;
+            const size_t N = mesh.size() - 1;
+            const auto& P = mesh[N];
+            const auto& S = mesh[N - 1];
+
+            const real_t mu_n = P.viscosity; // TODO - Double check
+            const real_t mu_s = (1.0 - P.width / S.width) * P.viscosity
+                                     + P.width / S.width  * S.viscosity;
+
+            SM_ELEMENT_D(A, N, N)   = - 2.0 * mu_n / (P.width + S.width);
+            SM_ELEMENT_D(A, N, N-1) = + 2.0 * mu_s / (P.width + S.width);
+            NV_Ith_S(b, N) = bc.global.second * P.width
+                           - 2.0 * mu_n * bc.upperWall.second / P.width;
             break;
         }
 
@@ -126,14 +147,11 @@ void fillSystem(
 }
 
 
-std::vector<real_t> steadyChannelFlow(
-    const std::vector<real_t>& mesh,
-    std::function<real_t(real_t)> viscosity,
+void steadyChannelFlow(
+    Mesh& mesh,
     BC bc
 )
 {
-    assert(viscosity && "Invalid viscosity function");
-
     if (!validEntry(mesh, bc))
     {
         const char* msg = "Invalid input";
@@ -144,10 +162,10 @@ std::vector<real_t> steadyChannelFlow(
     const size_t N = mesh.size();
     LinearSolver solver(N);
 
-    fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity, bc);
+    fillSystem(solver.Matrix(), solver.RHS(), mesh, bc);
     
     solver.solve();
-    return solver.getSolutionVector();
+    mesh.assignSolution(solver.getSolutionVector());
 }
 
 
@@ -183,7 +201,7 @@ real_t velocityGradient(
     return (u.at(i+1) - u.at(i-1)) / (mesh.at(i+1) - mesh.at(i-1));
 }
 
-
+#if 0
 std::vector<real_t> steadyChannelFlow(
     const std::vector<real_t>& mesh,
     real_t viscosity_mol,
@@ -391,5 +409,5 @@ std::vector<real_t> steadyChannelFlow(
 
     return u;
 }
-
+#endif
 } // namespace CMF

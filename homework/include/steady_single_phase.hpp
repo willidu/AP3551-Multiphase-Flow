@@ -24,7 +24,7 @@ namespace CMF
 //   (ii) prescribed flow-rate.
 // ****************************************************************************
 
-enum class WallBC   { Velocity, VelocityGradient, ShearStressRelation };
+enum class WallBC   { Velocity, VelocityGradient, ShearStress };
 enum class GlobalBC { PressureGradient, FlowRate };
 
 struct BC
@@ -34,18 +34,74 @@ struct BC
     std::pair<GlobalBC, real_t> global;
 };
 
+struct Mesh
+{
+    struct Node
+    {
+        real_t y;         // Node position
+        real_t width;     // Cell width
+        real_t u;         // Velocity
+        real_t viscosity; // Effective (dynamic) viscosity
+
+        Node() = default;
+        Node(real_t y, real_t width, real_t u, real_t viscosity)
+            : y(y), width(width), u(u), viscosity(viscosity) {}
+    };
+
+    Mesh() = default;
+    Mesh(size_t N, real_t H, real_t viscosity)
+    {
+        nodes.reserve(N);
+        real_t dy = H / N;
+        for (size_t i = 0; i < N; ++i)
+            nodes.emplace_back((i + 0.5) * dy, dy, 0.0, viscosity);
+    }
+    Mesh(std::vector<Node> nodes) : nodes(nodes) {}
+
+    std::vector<Node> nodes;
+
+    Node operator[](size_t i) const
+    {
+        return nodes.at(i);
+    }
+
+    size_t size() const noexcept { return nodes.size(); }
+
+    void assignSolution(const std::vector<real_t>& u)
+    {
+        assert(u.size() == nodes.size() && "Invalid solution vector size");
+        for (size_t i = 0; i < nodes.size(); ++i)
+            nodes.at(i).u = u.at(i);
+    }
+
+    std::pair<std::vector<real_t>, std::vector<real_t>> getSolution() const
+    {
+        std::vector<real_t> y, u;
+        y.reserve(nodes.size());
+        u.reserve(nodes.size());
+        for (const auto& node : nodes)
+        {
+            y.push_back(node.y);
+            u.push_back(node.u);
+        }
+        return {y, u};
+    }
+
+    void applyViscosityProfile(std::function<real_t(real_t)> profile)
+    {
+        for (auto& node : nodes)
+            node.viscosity = profile(node.y);
+    }
+};
+
 /**
  * Find the velocity field in a steady fully-developed single-phase channel flow
  * with variable viscosity. The viscosity profile is a prescribed input to the
  * routine.
  */
-std::vector<real_t> steadyChannelFlow(
-    const std::vector<real_t>& mesh,
-    std::function<real_t(real_t)> viscosity,
-    BC bc
-);
+void steadyChannelFlow(Mesh& mesh, BC bc);
 
-
+# if 0
 // ****************************************************************************
 //                                    TASK 2
 // ****************************************************************************
@@ -103,4 +159,5 @@ std::vector<real_t> steadyChannelFlow(
     real_t tol = 1e-6
 );
 
+#endif
 } // namespace CMF

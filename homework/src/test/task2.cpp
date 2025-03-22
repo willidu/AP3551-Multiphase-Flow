@@ -5,6 +5,7 @@ namespace CMF
 
 void testMixingLength()
 {
+    #if 0
     // We will now test the solver including the Prandtl mixing length model
     LOG_INFO("Running test code for Task 2 with mixing length model.");
 
@@ -79,6 +80,7 @@ void testMixingLength()
     plt::show();
 
     LOG_INFO("Test code for Task 2 finished.");
+    #endif
 }
 
 } // namespace CMF
