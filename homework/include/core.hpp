@@ -64,6 +64,27 @@ private:
 
 std::vector<real_t> channelMesh1D(size_t N, real_t H, real_t s = 1.0);
 
+
+/**
+ * @brief Van Driest damping function.
+ * 
+ * @param yplus   [--] y+ at the wall
+ * @param aplus   [--] A+ parameter. Default is 26.0
+ * @return real_t [--] Van Driest damping function value
+ */
+real_t vanDriest(real_t yplus, real_t aplus = 26.0);
+
+
+/**
+ * @brief Calculate U+ given some y+ and a roughness height ks+.
+ * 
+ * @param yplus   [--] y+ at the wall
+ * @param ksplus  [--] ks+ roughness height. Default is 0.0
+ * @param kappa   [--] Von Karman constant   Default is 0.41
+ * @return real_t [--] U+ at the wall
+ */
+real_t uplus(real_t yplus, real_t ksplus = 0.0, real_t kappa = 0.41);
+
 } // namespace CMF
 
 #define LOG_TRACE(...)    ::CMF::Log::getLogger()->trace(__VA_ARGS__)

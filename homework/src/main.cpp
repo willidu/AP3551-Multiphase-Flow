@@ -12,4 +12,6 @@ int main()
     // Test for Task 2
     CMF::testMixingLength();
 
+    // Test for Task 3
+    CMF::testWallFunction();
 }

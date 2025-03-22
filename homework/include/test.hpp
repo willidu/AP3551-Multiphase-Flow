@@ -9,4 +9,7 @@ void givenDP_givenWallVel();
 // Task 2
 void testMixingLength();
 
+// Task 3
+void testWallFunction();
+
 }  // namespace CMF

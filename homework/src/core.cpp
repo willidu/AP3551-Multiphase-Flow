@@ -80,4 +80,35 @@ void LinearSolver::solve(real_t tol)
     }
 }
 
+
+real_t vanDriest(real_t yplus, real_t aplus)
+{
+    return 1.0 - std::exp(-yplus / aplus);
+}
+
+
+real_t uplus(real_t yplus, real_t ksplus, real_t kappa)
+{
+    if (yplus < 5.0)
+    {
+        // Viscous sub-layer
+        return yplus;
+    }
+    else if (yplus < 20.0)
+    {
+        // Transition region
+        LOG_WARN("Mesh is inside buffer layer");
+        return yplus;
+    }
+    else if (yplus > 20.0 && yplus < 300.0)
+    {
+        // Log-law region
+        return std::log(yplus) / kappa + 5.0;  // TODO add roughness
+    }
+    // Fully turbulent region
+    // TODO how to handle this?
+    LOG_WARN("Mesh is inside fully turbulent region");
+    return yplus;
+}
+
 } // namespace CMF
