@@ -67,13 +67,6 @@ struct Mesh
 
     size_t size() const noexcept { return nodes.size(); }
 
-    void assignSolution(const std::vector<real_t>& u)
-    {
-        assert(u.size() == nodes.size() && "Invalid solution vector size");
-        for (size_t i = 0; i < nodes.size(); ++i)
-            nodes.at(i).u = u.at(i);
-    }
-
     std::pair<std::vector<real_t>, std::vector<real_t>> getSolution() const
     {
         std::vector<real_t> y, u;
@@ -87,11 +80,46 @@ struct Mesh
         return {y, u};
     }
 
-    void applyViscosityProfile(std::function<real_t(real_t)> profile)
+    std::pair<std::vector<real_t>, std::vector<real_t>> getViscosity() const
+    {
+        std::vector<real_t> y, mu;
+        y.reserve(nodes.size());
+        mu.reserve(nodes.size());
+        for (const auto& node : nodes)
+        {
+            y.push_back(node.y);
+            mu.push_back(node.viscosity);
+        }
+        return {y, mu};
+    }
+
+    void setVelocityProfile(const std::vector<real_t>& profile)
+    {
+        assert(profile.size() == nodes.size() && "Invalid profile size");
+        for (size_t i = 0; i < nodes.size(); ++i)
+            nodes.at(i).u = profile.at(i);
+    }
+
+    // Continuous viscosity model
+    void setViscosityProfile(std::function<real_t(real_t)> profile)
     {
         for (auto& node : nodes)
             node.viscosity = profile(node.y);
     }
+
+    // Discrete viscosity model
+    void setViscosityProfile(const std::vector<real_t>& profile)
+    {
+        assert(profile.size() == nodes.size() && "Invalid profile size");
+        for (size_t i = 0; i < nodes.size(); ++i)
+            nodes.at(i).viscosity = profile.at(i);
+    }
+
+    inline real_t height() const
+    {
+        return nodes.back().y + nodes.back().width / 2.0;
+    }
+
 };
 
 /**
@@ -101,7 +129,6 @@ struct Mesh
  */
 void steadyChannelFlow(Mesh& mesh, BC bc);
 
-# if 0
 // ****************************************************************************
 //                                    TASK 2
 // ****************************************************************************
@@ -118,25 +145,27 @@ void steadyChannelFlow(Mesh& mesh, BC bc);
  * prescribed input to the routine. The mixing length is used to compute the
  * eddy viscosity.
  * 
- * @param mesh         Mesh points
- * @param viscosity    Molecular viscosity.
- * @param mixingLength The mixing length model.
+ * @param mesh         Mesh.
  * @param bc           Boundary conditions.
+ * @param viscosity    Molecular viscosity.
+ * @param density      Fluid density.
+ * @param mixingLength The mixing length model.
  * @param maxIter      Maximum number of non-linear iterations.
  * @param tol          Stopping criteria for non-linear iterations.
  * 
  * @return Channel velocity field with eddy viscosity.
  */
-std::vector<real_t> steadyChannelFlow(
-    const std::vector<real_t>& mesh,
+void steadyChannelFlow(
+    Mesh& mesh,
+    const BC& bc,
     real_t viscosity,
     real_t density,
     std::function<real_t(real_t)> mixingLength,
-    BC bc,
     size_t maxIter = 500,
     real_t tol = 1e-6
 );
 
+# if 0
 
 // ****************************************************************************
 //                                    TASK 3

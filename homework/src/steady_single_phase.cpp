@@ -165,55 +165,66 @@ void steadyChannelFlow(
     fillSystem(solver.Matrix(), solver.RHS(), mesh, bc);
     
     solver.solve();
-    mesh.assignSolution(solver.getSolutionVector());
-}
-
-
-size_t findIndex(
-    const std::vector<real_t>& mesh,
-    real_t y
-)
-{
-    const auto it = std::lower_bound(mesh.begin(), mesh.end(), y);
-
-    if (it == mesh.end())
-        return mesh.size() - 1;
-
-    if (it == mesh.begin())
-        return 0;
-
-    return std::distance(mesh.begin(), it);
+    mesh.setVelocityProfile(solver.getSolutionVector());
 }
 
 
 real_t velocityGradient(
-    const std::vector<real_t>& mesh,
-    const std::vector<real_t>& u,
+    const Mesh& mesh,
+    const BC& bc,
     size_t i
 )
 {
     if (i == 0)
-        return (u.at(1) - u.at(0)) / (mesh.at(1) - mesh.at(0));
+        return 2.0 * (mesh[0].u - bc.lowerWall.second) / mesh[0].width;
     
     if (i == mesh.size() - 1)
-        return (u.at(i) - u.at(i-1)) / (mesh.at(i) - mesh.at(i-1));
+        return 2.0 * (bc.upperWall.second - mesh[i].u) / mesh[i].width;
 
-    return (u.at(i+1) - u.at(i-1)) / (mesh.at(i+1) - mesh.at(i-1));
+    // Linear interpolation
+    const auto& P = mesh[i];
+    const auto& N = mesh[i+1];
+    const auto& S = mesh[i-1];
+
+    // return (N.u - S.u) / (P.width);
+
+    const real_t u_n = (1.0 - P.width / N.width) * P.u
+                            + P.width / N.width  * N.u;
+    const real_t u_s = (1.0 - P.width / S.width) * P.u
+                            + P.width / S.width  * S.u;
+    return (u_n - u_s) / P.width;
 }
 
-#if 0
-std::vector<real_t> steadyChannelFlow(
-    const std::vector<real_t>& mesh,
-    real_t viscosity_mol,
+
+real_t yplus(const Mesh& mesh, const BC& bc, size_t i, real_t density)
+{
+    const size_t N = mesh.size();
+    const real_t H = mesh.height();
+    const real_t yplus = std::min(
+        mesh[i].y       * std::sqrt(density / mesh[i].viscosity * std::abs(velocityGradient(mesh, bc, 0))),
+        (H - mesh[i].y) * std::sqrt(density / mesh[i].viscosity * std::abs(velocityGradient(mesh, bc, N-1)))
+    );
+    assert(yplus > 0.0 && "Invalid y+");
+    return yplus;
+}
+
+void steadyChannelFlow(
+    Mesh& mesh,
+    const BC& bc,
+    real_t viscosity_mol,  // Also stored in mesh, but will be overwritten
     real_t density,
     std::function<real_t(real_t)> mixingLength,
-    BC bc,
     size_t maxIter,
     real_t tol
 )
 {
     assert(viscosity_mol > 0.0 && "Invalid molecular viscosity");
     assert(density > 0.0 && "Invalid density");
+    assert(mixingLength && "Invalid mixing length function");
+    assert(bc.lowerWall.first == WallBC::Velocity
+        && bc.upperWall.first == WallBC::Velocity
+        && "Only Velocity BC is supported"
+    );
 
     if (!validEntry(mesh, bc))
     {
@@ -222,37 +233,37 @@ std::vector<real_t> steadyChannelFlow(
         throw std::runtime_error(msg);
     }
 
-    const size_t N = mesh.size();
-
-    // We will fist assume that the eddy viscosity is zero
-    std::function<real_t(real_t)> viscosity = [&](real_t y) -> real_t
-    {
-        return viscosity_mol;
-    };
-
-    std::vector<real_t> u;
-    {
-        LinearSolver solver(N);
-        fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity, bc);
-        solver.solve();
-        u = solver.getSolutionVector();
-    }
+    // Initial guess with no eddy viscosity
+    mesh.setViscosityProfile([&](real_t){ return viscosity_mol; });
+    steadyChannelFlow(mesh, bc);
+    std::vector<real_t> u = mesh.getSolution().second;
+    std::vector<real_t> u_new;
 
     // We will now iterate to find a solution with non-zero eddy viscosity
+    // LOG_TRACE("Starting iteration");
     for (size_t iter = 0; iter < maxIter; ++iter)
     {
-        LinearSolver solver(N);
+        // LOG_INFO("Iteration {0}", iter);
+        LinearSolver solver(mesh.size());
 
-        viscosity = [&](real_t y) -> real_t
+        // Update effective viscosity
+        constexpr real_t relax = 0.1;
+        std::vector<real_t> mu_effective(mesh.size());
+        for (size_t i = 0; i < mesh.size(); ++i)
         {
-            return viscosity_mol + density
-                                 * std::pow(mixingLength(y), 2.0) 
-                                 * std::abs(velocityGradient(mesh, u, findIndex(mesh, y)));
-        };
+            // real_t yp = yplus(mesh, bc, i, density);
+            // LOG_TRACE("y+ = {0:.2f}", yp);
+            const real_t mu_eff =  viscosity_mol
+                                    + density
+                                    * std::pow(mixingLength(mesh[i].y), 2) 
+                                    * std::abs(velocityGradient(mesh, bc, i))
+                                    * vanDriest(yplus(mesh, bc, i, density));
+            mu_effective.at(i) = (1.0 - relax) * mesh[i].viscosity + relax * mu_eff;
+        }
+        mesh.setViscosityProfile(mu_effective);
 
-        fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity, bc);
-        solver.solve();
-        std::vector<real_t> u_new = solver.getSolutionVector();
+        steadyChannelFlow(mesh, bc);
+        u_new = mesh.getSolution().second;
 
         // Convergence with L2 norm
         const real_t error = std::sqrt(std::inner_product(
@@ -260,25 +271,22 @@ std::vector<real_t> steadyChannelFlow(
             [](real_t a, real_t b) { return std::pow(a - b, 2.0); }
         ));
 
-        u = u_new;
-
         if (error < tol)
         {
             LOG_INFO("Converged after {0} iterations", iter);
             break;
-        }
-
+        }        
         if (iter == maxIter - 1)
         {
             LOG_WARN(
                 "Did not converge after {0} iterations. Final residual: {1:.2e}",
                 maxIter, error);
         }
-    }
-
-    return u;
+        u = u_new;
+    }   
 }
 
+#if 0
 
 std::vector<real_t> steadyChannelFlow(
     const std::vector<real_t>& mesh,

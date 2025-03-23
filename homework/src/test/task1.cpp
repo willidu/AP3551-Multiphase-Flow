@@ -154,8 +154,8 @@ void givenDP_givenWallVel()
     {
         return 1e-3 * (y + 0.01 * H) / H;
     };
-    mesh.applyViscosityProfile(viscosityProfile);
-    mesh_nonuniform.applyViscosityProfile(viscosityProfile);
+    mesh.setViscosityProfile(viscosityProfile);
+    mesh_nonuniform.setViscosityProfile(viscosityProfile);
 
     bc = BC({{WallBC::Velocity, 0.0},
              {WallBC::Velocity, 0.0},
