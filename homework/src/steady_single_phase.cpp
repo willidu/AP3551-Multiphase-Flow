@@ -186,8 +186,6 @@ real_t velocityGradient(
     const auto& N = mesh[i+1];
     const auto& S = mesh[i-1];
 
-    // return (N.u - S.u) / (P.width);
-
     const real_t u_n = (1.0 - P.width / N.width) * P.u
                             + P.width / N.width  * N.u;
     const real_t u_s = (1.0 - P.width / S.width) * P.u
@@ -208,6 +206,7 @@ real_t yplus(const Mesh& mesh, const BC& bc, size_t i, real_t density)
     return yplus;
 }
 
+
 void steadyChannelFlow(
     Mesh& mesh,
     const BC& bc,
@@ -215,6 +214,7 @@ void steadyChannelFlow(
     real_t density,
     std::function<real_t(real_t)> mixingLength,
     size_t maxIter,
+    real_t relax,
     real_t tol
 )
 {
@@ -225,6 +225,7 @@ void steadyChannelFlow(
         && bc.upperWall.first == WallBC::Velocity
         && "Only Velocity BC is supported"
     );
+    assert(relax > 0.0 && relax < 1.0 && "Invalid relaxation factor");
 
     if (!validEntry(mesh, bc))
     {
@@ -232,28 +233,20 @@ void steadyChannelFlow(
         LOG_ERROR(msg);
         throw std::runtime_error(msg);
     }
-
+    
     // Initial guess with no eddy viscosity
-    mesh.setViscosityProfile([&](real_t){ return viscosity_mol; });
+    std::vector<real_t> mu_effective(mesh.size(), viscosity_mol);
+    mesh.setViscosityProfile(mu_effective);
     steadyChannelFlow(mesh, bc);
     std::vector<real_t> u = mesh.getSolution().second;
     std::vector<real_t> u_new;
 
     // We will now iterate to find a solution with non-zero eddy viscosity
-    // LOG_TRACE("Starting iteration");
     for (size_t iter = 0; iter < maxIter; ++iter)
     {
-        // LOG_INFO("Iteration {0}", iter);
-        LinearSolver solver(mesh.size());
-
-        // Update effective viscosity
-        constexpr real_t relax = 0.1;
-        std::vector<real_t> mu_effective(mesh.size());
         for (size_t i = 0; i < mesh.size(); ++i)
         {
-            // real_t yp = yplus(mesh, bc, i, density);
-            // LOG_TRACE("y+ = {0:.2f}", yp);
-            const real_t mu_eff =  viscosity_mol
+            const real_t mu_eff = viscosity_mol
                                     + density
                                     * std::pow(mixingLength(mesh[i].y), 2) 
                                     * std::abs(velocityGradient(mesh, bc, i))

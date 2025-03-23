@@ -129,6 +129,7 @@ struct Mesh
  */
 void steadyChannelFlow(Mesh& mesh, BC bc);
 
+
 // ****************************************************************************
 //                                    TASK 2
 // ****************************************************************************
@@ -145,12 +146,15 @@ void steadyChannelFlow(Mesh& mesh, BC bc);
  * prescribed input to the routine. The mixing length is used to compute the
  * eddy viscosity.
  * 
+ * @note Van Driest damping function is applied internally.
+ * 
  * @param mesh         Mesh.
  * @param bc           Boundary conditions.
  * @param viscosity    Molecular viscosity.
  * @param density      Fluid density.
  * @param mixingLength The mixing length model.
  * @param maxIter      Maximum number of non-linear iterations.
+ * @param relaxation   Relaxation factor for the eddy viscosity. Default is 0.1.
  * @param tol          Stopping criteria for non-linear iterations.
  * 
  * @return Channel velocity field with eddy viscosity.
@@ -162,6 +166,7 @@ void steadyChannelFlow(
     real_t density,
     std::function<real_t(real_t)> mixingLength,
     size_t maxIter = 500,
+    real_t relaxation = 0.1,
     real_t tol = 1e-6
 );
 

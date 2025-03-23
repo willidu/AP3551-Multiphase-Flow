@@ -19,17 +19,23 @@ void testMixingLength()
     Mesh mesh{N, H, molecularViscosity};  // Unform mesh
     Mesh mesh_nonuniform = [&]()
     {
-        std::vector<real_t> positions = channelMesh1D(N, H, 3.0);
+        const real_t wallDistance = 0.1 * H;  // Placement of first and last node from wall
+        const real_t dy = (H - 2.0 * wallDistance) / (N - 1);
+
         std::vector<Mesh::Node> nodes;
-        real_t cumsum = 0.0;
-        for (size_t i = 0; i < N; i++)
+        nodes.emplace_back(wallDistance, 2.0 * wallDistance, 0.0, molecularViscosity);
+
+        real_t cumsum = 2.0 * wallDistance;
+        for (size_t i = 1; i < N-1; i++)
         {
-            const real_t y = positions.at(i);
-            const real_t width = 2.0 * (y - cumsum);
+            const real_t y = wallDistance + i * dy;
+            const real_t width = 2.0 * dy;
             assert(width > 0.0 && "Invalid width in mesh generation");
             cumsum += width;
             nodes.emplace_back(y, width, 0.0, molecularViscosity);
         }
+
+        nodes.emplace_back(H - wallDistance, 2.0 * wallDistance, 0.0, molecularViscosity);
         return Mesh{nodes};
     }();
 
@@ -46,74 +52,42 @@ void testMixingLength()
     };
 
     steadyChannelFlow(mesh, bc, molecularViscosity, density, mixingLength, 100);
-    steadyChannelFlow(mesh_nonuniform, bc, molecularViscosity, density, mixingLength, 1'000);
+    steadyChannelFlow(mesh_nonuniform, bc, molecularViscosity, density, mixingLength, 100);
 
     auto [y, u] = mesh.getSolution();
     auto [y2, u2] = mesh_nonuniform.getSolution();
 
-    plt::figure();    
+    plt::figure();
     plt::ylim(0.0, H);
-    // plt::xlim(0.0, 13.0);
+    plt::xlim(0.0, 1.0);
     plt::named_plot("Uniform", u, y, "o-");
     plt::named_plot("Non-uniform", u2, y2, "x-");
     plt::xlabel("Velocity [m/s]");
     plt::ylabel("Height [m]");
-    plt::title("Mixing length model");
+    plt::title("Mixing length model with damping");
     plt::grid(true);
     plt::legend();
-    
+
+#if 0
     std::vector<real_t> l(N);
     for (size_t i = 0; i < N; ++i)
-    l.at(i) = mixingLength(y.at(i));
+        l.at(i) = mixingLength(y.at(i));
     plt::figure();
     plt::plot(l, y);
     plt::xlabel("Mixing length [m]");
     plt::ylabel("Height [m]");
     plt::title("Mixing length profile");
     plt::grid(true);
-    
+#endif
+
     plt::figure();
-    auto effective_viscosity = mesh.getViscosity().second;
-    plt::plot(effective_viscosity, y);
-    effective_viscosity = mesh_nonuniform.getViscosity().second;
-    plt::plot(effective_viscosity, y2);
+    plt::named_plot("Uniform", mesh.getViscosity().second, y, "o-");
+    plt::named_plot("Non-uniform", mesh_nonuniform.getViscosity().second, y2, "x-");
     plt::xlabel("Viscosity [Pa.s]");
     plt::ylabel("Height [m]");
     plt::title("Effective viscosity profile");
     plt::grid(true);
-
-    #if 0
-
-    // Solution with laminar flow
-    std::vector<real_t> result = steadyChannelFlow(
-        mesh, molecularViscosity, density,
-        [](real_t){ return 0.0; }, // No eddy viscosity
-        bc
-    );
-
-    plt::figure();
-    plt::named_plot("Laminar", result, mesh);
-
-    // TODO This does not converge. Saddle at res 3.82e-2
-    result = steadyChannelFlow(mesh, molecularViscosity, density,
-                               mixingLength, bc, 1'000, 1e-4);
-
-    plt::named_plot("Mixing length", result, mesh);
-    plt::ylim(0.0, H);
-    plt::xlabel("Velocity [m/s]");
-    plt::ylabel("Height [m]");
-    plt::title("Constant viscosity with no-slip and pressure driven flow");
-    plt::grid(true);
     plt::legend();
-
-    // Separate plot for the mixing length results
-    plt::figure();
-    plt::plot(result, mesh);
-    plt::xlabel("Velocity [m/s]");
-    plt::ylabel("Height [m]");
-    plt::title("Mixing length model");
-    plt::grid(true);
-    #endif
 
     LOG_INFO("Test code for Task 2 finished.");
     plt::show();
