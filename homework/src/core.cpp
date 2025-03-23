@@ -23,7 +23,8 @@ std::vector<real_t> channelMesh1D(size_t N, real_t H, real_t s)
 
     for (size_t i = 0; i < N; ++i)
     {
-        const real_t xi = -1.0 + 2.0 * i / (N - 1);
+        // Transform xi = [-1, 1] to y = (0, H) (not including endpoints)
+        const real_t xi = -1.0 + 2.0 * (i + 1) / N;
         mesh[i] = (H / 2) * (1.0 + std::tanh(s * xi) / std::tanh(s));
     }
 
