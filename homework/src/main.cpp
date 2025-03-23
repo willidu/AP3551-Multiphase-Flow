@@ -9,9 +9,6 @@ int main()
     // Test for Task 1
     CMF::givenDP_givenWallVel();
 
-    // Test for Task 2
+    // Test for Task 2 and 3 (also includes wall functions)
     CMF::testMixingLength();
-
-    // Test for Task 3
-    CMF::testWallFunction();
 }

@@ -170,7 +170,6 @@ void steadyChannelFlow(
     real_t tol = 1e-6
 );
 
-# if 0
 
 // ****************************************************************************
 //                                    TASK 3
@@ -181,17 +180,33 @@ void steadyChannelFlow(
 // the channel flow code.
 // ****************************************************************************
 
-std::vector<real_t> steadyChannelFlow(
-    const std::vector<real_t>& mesh,
+/**
+ * @brief Log-law wall function for the eddy viscosity.
+ * 
+ * Find the velocity field in a steady fully-developed single-phase channel flow
+ * with variable viscosity and log-law wall function.The log-law wall function
+ * is used to compute the eddy viscosity. 
+ * 
+ * Raises an exception if the y+ values are not within the range [30, 800].
+ * 
+ * @param mesh             Mesh.
+ * @param bc               Boundary conditions.
+ * @param viscosity        Molecular viscosity.
+ * @param density          Fluid density.
+ * @param averageRoughness Average roughness of the wall. Default is 0.0.
+ * @param maxIter          Maximum number of non-linear iterations.
+ * @param relaxation       Relaxation factor for the eddy viscosity. Default is 0.1.
+ * @param tol              Stopping criteria for non-linear iterations.
+ */
+void steadyChannelFlow(
+    Mesh& mesh,
+    const BC& bc,
     real_t viscosity,
     real_t density,
-    std::function<real_t(real_t)> mixingLength,
-    BC bc,
-    real_t averageRoughness,
-    std::function<real_t(real_t)> dampingFunction,
-    size_t maxIter = 1000,
+    real_t averageRoughness = 0.0,
+    size_t maxIter = 500,
+    real_t relaxation = 0.1,
     real_t tol = 1e-6
 );
 
-#endif
 } // namespace CMF

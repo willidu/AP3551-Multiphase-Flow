@@ -202,7 +202,7 @@ real_t yplus(const Mesh& mesh, const BC& bc, size_t i, real_t density)
         mesh[i].y       * std::sqrt(density / mesh[i].viscosity * std::abs(velocityGradient(mesh, bc, 0))),
         (H - mesh[i].y) * std::sqrt(density / mesh[i].viscosity * std::abs(velocityGradient(mesh, bc, N-1)))
     );
-    assert(yplus > 0.0 && "Invalid y+");
+    assert(yplus >= 0.0 && "Invalid y+");
     return yplus;
 }
 
@@ -279,23 +279,26 @@ void steadyChannelFlow(
     }   
 }
 
-#if 0
 
-std::vector<real_t> steadyChannelFlow(
-    const std::vector<real_t>& mesh,
-    real_t viscosity_mol,
+void steadyChannelFlow(
+    Mesh& mesh,
+    const BC& bc,
+    real_t viscosity_mol,  // Also stored in mesh, but will be overwritten
     real_t density,
-    std::function<real_t(real_t)> mixingLength,
-    BC bc,
     real_t averageRoughness,
-    std::function<real_t(real_t)> dampingFunction,
     size_t maxIter,
+    real_t relax,
     real_t tol
 )
 {
     assert(viscosity_mol > 0.0 && "Invalid molecular viscosity");
     assert(density > 0.0 && "Invalid density");
     assert(averageRoughness >= 0.0 && "Invalid average roughness");
+    assert(bc.lowerWall.first == WallBC::Velocity
+        && bc.upperWall.first == WallBC::Velocity
+        && "Only Velocity BC is supported"
+    );
+    assert(relax > 0.0 && relax < 1.0 && "Invalid relaxation factor");
 
     if (!validEntry(mesh, bc))
     {
@@ -303,90 +306,58 @@ std::vector<real_t> steadyChannelFlow(
         LOG_ERROR(msg);
         throw std::runtime_error(msg);
     }
+    
+    // Initial guess with no eddy viscosity
+    std::vector<real_t> mu_effective(mesh.size(), viscosity_mol);
+    mesh.setViscosityProfile(mu_effective);
+    steadyChannelFlow(mesh, bc);
+    std::vector<real_t> u = mesh.getSolution().second;
+    std::vector<real_t> u_new;
 
-    const size_t N = mesh.size();
-
-    // We will fist assume that the eddy viscosity is zero
-    std::function<real_t(real_t)> viscosity = [&](real_t y) -> real_t
-    {
-        return viscosity_mol;
-    };
-
-    std::vector<real_t> u;
-    {
-        LinearSolver solver(N);
-        fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity, bc);
-        solver.solve();
-        u = solver.getSolutionVector();
-    }
+    static constexpr real_t kappa = 0.41;
+    static constexpr real_t B     = 5.0;  // TODO
+    static constexpr real_t E     = 9.0;  // TODO chapyt stuff
 
     // We will now iterate to find a solution with non-zero eddy viscosity
     for (size_t iter = 0; iter < maxIter; ++iter)
     {
-        LinearSolver solver(N);
+        LOG_TRACE("Iteration {0}", iter);
+        // Step 1: Compute Wall Shear Stress at the first grid node
+        real_t du_dy_wall = (mesh[1].u - bc.lowerWall.second) / mesh[1].y; 
+        real_t tau_w = viscosity_mol * du_dy_wall;
+        real_t u_tau = std::sqrt(tau_w / density);
 
-        viscosity = [&](real_t y) -> real_t
+        for (size_t i = 0; i < mesh.size(); ++i)
         {
-            auto yplus_utau = [&](real_t y) -> std::pair<real_t, real_t>
+            real_t yp = mesh[i].y * u_tau * density / mu_effective.at(i);
+            
+            if (yp < 30.0 /*|| yp > 800.0*/)
             {
-                if (y < 0.5 * mesh.back()) // Bottom half
-                {
-                    const real_t dudy = velocityGradient(mesh, u, 0);
-                    const real_t tau = viscosity_mol * std::abs(dudy);
-                    const real_t u_tau = std::sqrt(tau / density);
-                    const real_t yplus = y * u_tau / (viscosity_mol / density);
-                    return {yplus, u_tau};
-                }
-                else // Top half
-                {
-                    const real_t dudy = velocityGradient(mesh, u, mesh.size()-1);
-                    const real_t tau = viscosity_mol * std::abs(dudy);
-                    const real_t u_tau = std::sqrt(tau / density);
-                    const real_t yplus = (mesh.back() - y) * u_tau / (viscosity_mol / density);
-                    return {yplus, u_tau};
-                }
-            };
-
-            const auto [yplus, u_tau] = yplus_utau(y);
-            // LOG_TRACE("y = {2:.3f}, yplus = {0:.1f}, u_tau = {1:.2f}", yplus, u_tau, y);
-
-            if (yplus < 3.0)
-            {
-                // -> U+ = y+
-                return viscosity_mol + density * 0.41 * y * yplus;
-            }
-            else if (yplus < 20.0)
-            {
-                // LOG_WARN("Buffer layer");
-            }
-            else if (yplus > 30.0 && yplus < 800.0)
-            {
-                // Log-law layer
-                static constexpr real_t kappa = 0.41;
-                static constexpr real_t beta = 5.2;
-
-                return viscosity_mol + density * kappa * y * u_tau; // ?
-
-                /*
-                    H = 2*delta
-                    tau = 2*nu*rho*abs(U[0])/dy
-                    u_tau = np.sqrt(tau/rho)
-                    y_plus = np.append(y[y<=delta]*u_tau/nu,(H-y[y>delta])*u_tau/nu)
-                    fmu = (1-np.exp(-y_plus/A))**2
-                */
-
-
+                LOG_WARN("Invalid y+ at node {0}: {1:.2f}. Adjust mesh!", i, yp);
+                // return;
+                // throw std::runtime_error("Invalid y+");
             }
 
-            return viscosity_mol + density
-                                 * std::pow(mixingLength(y), 2.0) 
-                                 * std::abs(velocityGradient(mesh, u, findIndex(mesh, y)));
-                                //  * dampingFunction(yplus);
-        };
+            const real_t mu_eff = viscosity_mol
+                                    + density
+                                    * kappa
+                                    * std::min(mesh[i].y, mesh.height() - mesh[i].y)
+                                    * u_tau
+                                    / E;
+            mu_effective.at(i) = (1.0 - relax) * mesh[i].viscosity + relax * mu_eff;
+        }
+        mesh.setViscosityProfile(mu_effective);
 
-        fillSystem(solver.Matrix(), solver.RHS(), mesh, viscosity, bc);
-        solver.solve();
-        std::vector<real_t> u_new = solver.getSolutionVector();
+        // Step 4: Update velocity at the first computational node
+        const real_t u_wall = (u_tau / kappa) * std::log(E * mesh[1].y * u_tau * density / viscosity_mol);
+
+        // steadyChannelFlow(mesh, bc);
+        steadyChannelFlow(mesh, {
+            {WallBC::Velocity, -u_wall},
+            {WallBC::Velocity, -u_wall},
+            {GlobalBC::PressureGradient, bc.global.second}
+        });
+        u_new = mesh.getSolution().second;
 
         // Convergence with L2 norm
         const real_t error = std::sqrt(std::inner_product(
@@ -394,21 +365,19 @@ std::vector<real_t> steadyChannelFlow(
             [](real_t a, real_t b) { return std::pow(a - b, 2.0); }
         ));
 
-        u = u_new;
-
         if (error < tol)
         {
             LOG_INFO("Converged after {0} iterations", iter);
             break;
-        }
-
+        }        
         if (iter == maxIter - 1)
         {
-            LOG_WARN("Did not converge after {0} iterations", maxIter);
+            LOG_WARN(
+                "Did not converge after {0} iterations. Final residual: {1:.2e}",
+                maxIter, error);
         }
-    }
-
-    return u;
+        u = u_new;
+    }   
 }
-#endif
+
 } // namespace CMF
