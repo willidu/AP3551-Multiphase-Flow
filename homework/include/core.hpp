@@ -16,11 +16,22 @@ using real_t = sunrealtype;
 #include <spdlog/spdlog.h>
 #include <spdlog/fmt/ostr.h>
 
+
+#ifdef __GNUC__  // Suppress warnings from matplotlibcpp
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+
 #ifndef WITHOUT_NUMPY
     #define WITHOUT_NUMPY
 #endif
+
 #include <matplotlibcpp.h>
 namespace plt = matplotlibcpp;
+
+#ifdef __GNUC__ // Restore warnings
+    #pragma GCC diagnostic pop
+#endif
 
 
 namespace CMF
