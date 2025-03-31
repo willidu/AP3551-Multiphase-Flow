@@ -91,10 +91,20 @@ real_t vanDriest(real_t yplus, real_t aplus = 26.0);
  * 
  * @param yplus   [--] y+ at the wall
  * @param ksplus  [--] ks+ roughness height. Default is 0.0
- * @param kappa   [--] Von Karman constant   Default is 0.41
  * @return real_t [--] U+ at the wall
  */
-real_t uplus(real_t yplus, real_t ksplus = 0.0, real_t kappa = 0.41);
+real_t uplus(real_t yplus, real_t ksplus = 0.0);
+
+
+/**
+ * @brief Calculate the wall friction velocity.
+ * 
+ * @param y       [m]     Distance from the wall
+ * @param U       [m/s]   Velocity at the wall
+ * @param nu      [m^2/s] Kinematic viscosity
+ * @return real_t [m/s]   Friction velocity u_tau
+ */
+real_t utau(real_t y, real_t U, real_t nu);
 
 } // namespace CMF
 

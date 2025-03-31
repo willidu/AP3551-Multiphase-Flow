@@ -88,28 +88,75 @@ real_t vanDriest(real_t yplus, real_t aplus)
 }
 
 
-real_t uplus(real_t yplus, real_t ksplus, real_t kappa)
+real_t uplus(real_t yplus, real_t ksplus)
 {
+    // TODO - Add roughness
+    static constexpr real_t kappa = 0.41;    // von Kármán constant
+    static constexpr real_t B = 5.0;         // Empirical constant
+
+    assert(yplus > 0.0 && "Invalid y+");
+
     if (yplus < 5.0)
     {
-        // Viscous sub-layer
+        // Viscous sublayer: Linear law
         return yplus;
     }
-    else if (yplus < 20.0)
+    else if (yplus < 30.0)
     {
-        // Transition region
-        LOG_WARN("Mesh is inside buffer layer");
-        return yplus;
+        // Blended transition
+        real_t t = (yplus - 5.0) / (30.0 - 5.0);
+        real_t U_viscous = 5.0;                            // U+ at y+ = 5
+        real_t U_log = (1.0 / kappa) * std::log(30.0) + B; // Log-law at y+ = 30
+        return (1 - t) * U_viscous + t * U_log;
     }
-    else if (yplus > 20.0 && yplus < 300.0)
+
+    // Log-law region
+    return (1.0 / kappa) * std::log(yplus) + B;
+}
+
+
+real_t utau(real_t y, real_t U, real_t nu)
+{
+    static constexpr real_t kappa = 0.41;    // von Kármán constant
+    static constexpr real_t B = 5.0;         // Empirical constant - TODO add roughness
+    static constexpr real_t tol = 1e-3;      // Convergence tolerance
+    static constexpr size_t maxIter = 1000;  // Max iterations for Newton's method
+
+    // Blended law of the wall residual function
+    auto f = [&](real_t u_tau)
     {
-        // Log-law region
-        return std::log(yplus) / kappa + 5.0;  // TODO add roughness
+        const real_t y_plus = y * u_tau / nu;
+        // TODO - add roughness
+        return uplus(y_plus, 0.0) - (U / u_tau);
+    };
+
+    // Initial guess: Blended approach
+    real_t u_tau = std::sqrt(nu * U / y);
+
+    // Newton's method to solve for u_tau
+    for (size_t iter = 0; iter < maxIter; ++iter)
+    {
+        const real_t y_plus = y * u_tau / nu;
+        const real_t df_du_tau = (y / nu) / ((1.0 / kappa) * (1.0 / y_plus)); // Approximate derivative
+        const real_t u_tau_new = u_tau - f(u_tau) / df_du_tau;
+
+        if (std::abs((u_tau_new - u_tau)/u_tau) < tol)
+            break;
+
+        u_tau = u_tau_new;
+
+        if (iter == maxIter - 1)
+        {
+            LOG_WARN("u_tau calculation did not converge after {0} iterations.", maxIter);
+            LOG_TRACE("Final y+ {0:.2e}, u_tau {1:.2e}", y_plus, u_tau);
+        }
     }
-    // Fully turbulent region
-    // TODO how to handle this?
-    LOG_WARN("Mesh is inside fully turbulent region");
-    return yplus;
+
+    if (std::isnan(u_tau))
+        LOG_WARN("u_tau calculation resulted in u_tau = NaN. "
+                 "This warning may be ignored if the final y+ is valid.");
+
+    return u_tau;
 }
 
 } // namespace CMF

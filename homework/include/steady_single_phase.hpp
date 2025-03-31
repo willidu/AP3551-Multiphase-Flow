@@ -42,6 +42,7 @@ struct Mesh
         real_t width;     // Cell width
         real_t u;         // Velocity
         real_t viscosity; // Effective (dynamic) viscosity
+        real_t yplus = 0.0;
 
         Node() = default;
         Node(real_t y, real_t width, real_t u, real_t viscosity)
@@ -60,7 +61,12 @@ struct Mesh
 
     std::vector<Node> nodes;
 
-    Node operator[](size_t i) const
+    const Node& operator[](size_t i) const
+    {
+        return nodes.at(i);
+    }
+
+    Node& operator[](size_t i)
     {
         return nodes.at(i);
     }
@@ -91,6 +97,19 @@ struct Mesh
             mu.push_back(node.viscosity);
         }
         return {y, mu};
+    }
+
+    std::pair<std::vector<real_t>, std::vector<real_t>> getYplusUplus() const
+    {
+        std::vector<real_t> y_plus, u_plus;
+        y_plus.reserve(nodes.size());
+        u_plus.reserve(nodes.size());
+        for (const auto& node : nodes)
+        {
+            y_plus.push_back(node.yplus);
+            u_plus.push_back(uplus(node.u));  // TODO - add roughness
+        }
+        return {y_plus, u_plus};
     }
 
     void setVelocityProfile(const std::vector<real_t>& profile)
@@ -191,6 +210,7 @@ void steadyChannelFlow(
  * 
  * @param mesh             Mesh.
  * @param bc               Boundary conditions.
+ * @param mixingLength     Undamped mixing length model for core region.
  * @param viscosity        Molecular viscosity.
  * @param density          Fluid density.
  * @param averageRoughness Average roughness of the wall. Default is 0.0.
@@ -201,6 +221,7 @@ void steadyChannelFlow(
 void steadyChannelFlow(
     Mesh& mesh,
     const BC& bc,
+    std::function<real_t(real_t)> mixingLength,
     real_t viscosity,
     real_t density,
     real_t averageRoughness = 0.0,
