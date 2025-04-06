@@ -32,6 +32,24 @@ std::vector<real_t> channelMesh1D(size_t N, real_t H, real_t s)
 }
 
 
+std::vector<real_t> logspace(real_t start, real_t end, size_t num_points)
+{
+    std::vector<real_t> result;
+    result.reserve(num_points);
+
+    const real_t log_start = std::log(start);
+    const real_t log_end = std::log(end);
+    const real_t step = (log_end - log_start) / (num_points - 1);
+
+    for (size_t i = 0; i < num_points; ++i)
+    {
+        result.push_back(std::exp(log_start + i * step));
+    }
+
+    return result;
+}
+
+
 LinearSolver::LinearSolver(size_t N)
   : m_Vars(N)
 {
@@ -94,7 +112,12 @@ real_t uplus(real_t yplus, real_t ksplus)
     static constexpr real_t kappa = 0.41;    // von Kármán constant
     static constexpr real_t B = 5.0;         // Empirical constant
 
-    assert(yplus > 0.0 && "Invalid y+");
+    // assert(yplus >= 0.0 && "Invalid y+");
+    if (yplus < 0.0)
+    {
+        LOG_WARN("Recieved negative y+ in uplus calculation: {0:.2e}", yplus);
+        return 0.1;
+    }
 
     if (yplus < 5.0)
     {
@@ -129,6 +152,12 @@ real_t utau(real_t y, real_t U, real_t nu)
         // TODO - add roughness
         return uplus(y_plus, 0.0) - (U / u_tau);
     };
+
+    if (U < 0.0)
+    {
+        LOG_WARN("Recieved negative velocity in u_tau calculation: {0:.2e}", U);
+        U = std::abs(U);
+    }
 
     // Initial guess: Blended approach
     real_t u_tau = std::sqrt(nu * U / y);

@@ -24,7 +24,7 @@ namespace CMF
 //   (ii) prescribed flow-rate.
 // ****************************************************************************
 
-enum class WallBC   { Velocity, VelocityGradient, ShearStress };
+enum class WallBC   { Velocity, VelocityGradient, ShearStress, WallFunction };
 enum class GlobalBC { PressureGradient, FlowRate };
 
 struct BC
@@ -107,7 +107,7 @@ struct Mesh
         for (const auto& node : nodes)
         {
             y_plus.push_back(node.yplus);
-            u_plus.push_back(uplus(node.u));  // TODO - add roughness
+            u_plus.push_back(uplus(node.yplus));  // TODO - add roughness
         }
         return {y_plus, u_plus};
     }
@@ -137,6 +137,22 @@ struct Mesh
     inline real_t height() const
     {
         return nodes.back().y + nodes.back().width / 2.0;
+    }
+
+    // Create a mesh which has points close to the walls of the channel
+    // The parameter S controls how close the points become at the wall.
+    static inline Mesh ResolvedWallMesh(real_t H, size_t N, real_t mu, real_t S = 2.0)
+    {
+        const std::vector<real_t> y = channelMesh1D(N, H, S);
+        std::vector<Mesh::Node> nodes;
+        real_t previous_height = 0.0;
+        for (const auto& y_i : y)
+        {
+            real_t width = 2.0 * (y_i - previous_height);
+            nodes.emplace_back(y_i, width, 0.0, mu);
+            previous_height = y_i;
+        }
+        return Mesh{nodes};
     }
 
 };
@@ -220,7 +236,7 @@ void steadyChannelFlow(
  */
 void steadyChannelFlow(
     Mesh& mesh,
-    const BC& bc,
+    BC bc,
     std::function<real_t(real_t)> mixingLength,
     real_t viscosity,
     real_t density,

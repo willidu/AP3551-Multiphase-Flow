@@ -92,6 +92,13 @@ void fillSystem(
             break;
         }
 
+        case WallBC::WallFunction:
+        {
+            SM_ELEMENT_D(A, 0, 0) = 1.0;
+            NV_Ith_S(b, 0) = bc.lowerWall.second;
+            break;
+        }
+
         default:
         {
             const char* msg = "Unsupported lower wall BC";
@@ -137,6 +144,14 @@ void fillSystem(
             break;
         }
 
+        case WallBC::WallFunction:
+        {
+            const size_t N = mesh.size() - 1;
+            SM_ELEMENT_D(A, N, N) = 1.0;
+            NV_Ith_S(b, N) = bc.upperWall.second;
+            break;
+        }
+
         default:
         {
             const char* msg = "Unsupported upper wall BC";
@@ -175,22 +190,16 @@ real_t velocityGradient(
     size_t i
 )
 {
-    if (i == 0)
-        return 2.0 * (mesh[0].u - bc.lowerWall.second) / mesh[0].width;
+    // Backward difference in upper half
+    if (i > mesh.size() / 2)
+        return (mesh[i].u - mesh[i-1].u) / mesh[i].width;
     
-    if (i == mesh.size() - 1)
-        return 2.0 * (bc.upperWall.second - mesh[i].u) / mesh[i].width;
+    // Forward difference in lower half
+    if (i < mesh.size() / 2)
+        return (mesh[i+1].u - mesh[i].u) / mesh[i].width;
 
-    // Linear interpolation
-    const auto& P = mesh[i];
-    const auto& N = mesh[i+1];
-    const auto& S = mesh[i-1];
-
-    const real_t u_n = (1.0 - P.width / N.width) * P.u
-                            + P.width / N.width  * N.u;
-    const real_t u_s = (1.0 - P.width / S.width) * P.u
-                            + P.width / S.width  * S.u;
-    return (u_n - u_s) / P.width;
+    // Central difference in middle
+    return (mesh[i+1].u - mesh[i-1].u) / (mesh[i+1].y - mesh[i-1].y);
 }
 
 
@@ -273,13 +282,14 @@ void steadyChannelFlow(
                 maxIter, error);
         }
         u = u_new;
-    }   
+    }
+    LOG_TRACE("Final y+ at first node: {0:.2f}", mesh[0].yplus);
 }
 
 
 void steadyChannelFlow(
     Mesh& mesh,
-    const BC& bc,
+    BC bc,
     std::function<real_t(real_t)> mixingLength,
     real_t viscosity_mol,  // Also stored in mesh, but will be overwritten
     real_t density,
@@ -297,7 +307,7 @@ void steadyChannelFlow(
         && bc.upperWall.first == WallBC::Velocity
         && "Only Velocity BC is supported"
     );
-    assert(relax > 0.0 && relax < 1.0 && "Invalid relaxation factor");
+    assert(relax > 0.0 && relax <= 1.0 && "Invalid relaxation factor");
 
     if (!validEntry(mesh, bc))
     {
@@ -306,19 +316,19 @@ void steadyChannelFlow(
         throw std::runtime_error(msg);
     }
     
-    // Initial guess with no eddy viscosity
     std::vector<real_t> mu_effective(mesh.size(), viscosity_mol);
-    mesh.setViscosityProfile(mu_effective);
-    steadyChannelFlow(mesh, bc);
     std::vector<real_t> u = mesh.getSolution().second;
     std::vector<real_t> u_new;
+
+    // Initial guess
+    real_t u_tau = std::sqrt(mesh.height() * std::abs(bc.global.second) / (4.0 * density));
 
     static constexpr real_t kappa = 0.41;  // TODO - remove?
 
     // We will now iterate to find a solution with non-zero eddy viscosity
     for (size_t iter = 0; iter < maxIter; ++iter)
     {
-        const real_t u_tau = utau(mesh[0].y, mesh[0].u, viscosity_mol / density);
+        const real_t delta_plus = density * u_tau * 0.5 * mesh.height() / viscosity_mol;
 
         for (size_t i = 0; i < mesh.size(); ++i)
         {
@@ -326,15 +336,26 @@ void steadyChannelFlow(
             const real_t yplus = density * u_tau * wallDistance / viscosity_mol;
             real_t mu_eff = viscosity_mol;
             
-            if (yplus < 30.0)
+            if (yplus < 30.0 && i == 0)
             {
                 LOG_WARN(
-                    "Invalid y+ at node {0} at iteration {2}: {1:.2f}. Adjust mesh!",
-                    i, yplus, iter);
+                    "Invalid y+ at iteration {0}: {1:.2f}. "
+                    "Ignore this if final solution is converged.",
+                    iter, yplus);
             }
-            else if (yplus < 200.0)
+            else if (yplus < 0.2 * delta_plus)
             {
                 mu_eff += density * kappa * wallDistance * u_tau;
+            }
+            else if (yplus < 0.3 * delta_plus)
+            {
+                // Apply blending between log-law region and wake
+                const real_t a = 0.5 * (1.0 + std::cos(M_PI * (yplus - 0.2 * delta_plus) / (0.1 * delta_plus)));
+                mu_eff += density * kappa * wallDistance * u_tau * a;
+                mu_eff += density
+                        * std::pow(mixingLength(wallDistance), 2) 
+                        * std::abs(velocityGradient(mesh, bc, i))
+                        * (1.0 - a);
             }
             else
             {
@@ -350,12 +371,10 @@ void steadyChannelFlow(
 
         // TODO - Add roughness
         const real_t slipVelocity = u_tau * uplus(mesh[0].yplus, 0.0);
+        bc.lowerWall = {WallBC::WallFunction, slipVelocity};
+        bc.upperWall = {WallBC::WallFunction, slipVelocity};
 
-        steadyChannelFlow(mesh, {
-            {WallBC::Velocity, slipVelocity},
-            {WallBC::Velocity, slipVelocity},
-            {GlobalBC::PressureGradient, bc.global.second}
-        });
+        steadyChannelFlow(mesh, bc);
         u_new = mesh.getSolution().second;
 
         // Convergence with L2 norm
@@ -367,15 +386,25 @@ void steadyChannelFlow(
         if (error < tol)
         {
             LOG_INFO("Converged after {0} iterations", iter);
+            LOG_TRACE("Final y+ at first node: {0:.2f}", mesh[0].yplus);
+            LOG_TRACE("Channel BL delta+ {0:.2f}", delta_plus);
             break;
-        }        
+        }
         if (iter == maxIter - 1)
         {
             LOG_WARN(
                 "Did not converge after {0} iterations. Final residual: {1:.2e}",
                 maxIter, error);
+            LOG_TRACE("Final y+ at first node: {0:.2f}", mesh[0].yplus);
+            LOG_TRACE("Channel BL delta+ {0:.2f}", delta_plus);
         }
+
         u = u_new;
+        u_tau = (1.0 - relax) * u_tau + relax * std::sqrt(
+            std::abs(
+                mu_effective.at(0) * (u_new[1] - u_new[0]) / (mesh[1].y - mesh[0].y)
+            ) / density
+        );
     }
 }
 
