@@ -14,5 +14,8 @@ void unsteadyLaminar();
 void unsteadyMixingLengthDamping();
 void unsteadyMixingLengthWallFunction();
 
+// Task 5
+void singleParticleTracking();
+void multipleParticleTracking();
 
 }  // namespace CMF
