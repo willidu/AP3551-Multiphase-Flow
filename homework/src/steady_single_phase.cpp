@@ -237,25 +237,21 @@ void steadyChannelFlow(
     std::vector<real_t> u = mesh.getSolution().second;
     std::vector<real_t> u_new;
 
+    // Initial guess
+    real_t u_tau = std::sqrt(mesh.height() * std::abs(bc.global.second) / (4.0 * density));
+
     // We will now iterate to find a solution with non-zero eddy viscosity
     for (size_t iter = 0; iter < maxIter; ++iter)
     {
-        const real_t u_tau = utau(mesh[0].y, mesh[0].u, viscosity_mol / density);
-
         for (size_t i = 0; i < mesh.size(); ++i)
         {
             const real_t wallDistance = std::min(mesh[i].y, mesh.height() - mesh[i].y);
             const real_t yplus = density * u_tau * wallDistance / viscosity_mol;
-
-            real_t mu_eff = density
+            const real_t mu_eff = viscosity_mol + density
                             * std::pow(mixingLength(wallDistance), 2) 
-                            * std::abs(velocityGradient(mesh, bc, i));
+                            * std::abs(velocityGradient(mesh, bc, i))
+                            * vanDriest(yplus);
 
-            if (yplus < 30.0)
-                mu_eff *= vanDriest(yplus);
-            
-            mu_eff += viscosity_mol;  // Added last so its not affected by damping
-            
             mu_effective.at(i) = (1.0 - relax) * mesh[i].viscosity + relax * mu_eff;
             mesh[i].yplus = yplus;
         }
@@ -274,7 +270,7 @@ void steadyChannelFlow(
         {
             LOG_INFO("Converged after {0} iterations", iter);
             break;
-        }        
+        }
         if (iter == maxIter - 1)
         {
             LOG_WARN(
@@ -282,6 +278,9 @@ void steadyChannelFlow(
                 maxIter, error);
         }
         u = u_new;
+        u_tau = (1.0 - relax) * u_tau + relax * (
+            u_new.at(0) / uplus(mesh[0].yplus, 0.0)
+        );
     }
     LOG_TRACE("Final y+ at first node: {0:.2f}", mesh[0].yplus);
 }
@@ -400,10 +399,8 @@ void steadyChannelFlow(
         }
 
         u = u_new;
-        u_tau = (1.0 - relax) * u_tau + relax * std::sqrt(
-            std::abs(
-                mu_effective.at(0) * (u_new[1] - u_new[0]) / (mesh[1].y - mesh[0].y)
-            ) / density
+        u_tau = (1.0 - relax) * u_tau + relax * (
+                u_new.at(0) / uplus(mesh[0].yplus, 0.0)
         );
     }
 }
