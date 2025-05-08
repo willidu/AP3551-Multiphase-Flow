@@ -108,7 +108,8 @@ void particleTracking(
 class ContinuousPhase
 {
 public:
-    ContinuousPhase(const Mesh& mesh, size_t samplePoints);
+    ContinuousPhase(const Mesh& mesh, size_t samplePoints,
+                    const std::function<real_t(real_t)>&);
 
     /**
      * @brief Get the velocity field at the position of a point particle.
@@ -131,7 +132,7 @@ private:
     const std::vector<real_t> m_Height;
     const std::vector<real_t> m_ResampledVel;
     const std::vector<real_t> m_ResampledTimeScale;
-    // const std::vector<real_t> m_ResampledTKE;
+    const std::vector<real_t> m_ResampledTKE;
     // const std::vector<real_t> m_ResampledDissipation;
 
 };  // class ContinuousPhase

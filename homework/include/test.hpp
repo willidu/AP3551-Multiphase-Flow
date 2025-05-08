@@ -20,5 +20,7 @@ void multipleParticleTracking();
 
 // Task 6
 void testResampling();
+void testTurbulentParticleTracking();
+void testTurbulentManyParticleTracking();
 
 }  // namespace CMF

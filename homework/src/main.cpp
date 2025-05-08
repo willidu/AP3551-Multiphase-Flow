@@ -23,4 +23,6 @@ int main()
 
     // Test for Task 6
     CMF::testResampling();
+    CMF::testTurbulentParticleTracking();
+    CMF::testTurbulentManyParticleTracking();
 }

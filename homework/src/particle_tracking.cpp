@@ -1,5 +1,7 @@
 #include "particle_tracking.hpp"
 
+#include <random>
+
 namespace CMF
 {
 
@@ -178,12 +180,45 @@ std::vector<real_t> linspace(real_t low, real_t high, size_t num)
 }
 
 
-ContinuousPhase::ContinuousPhase(const Mesh& mesh, size_t samplePoints)
+std::vector<real_t> mixingLengthTimeScale(const std::vector<real_t>& y,
+                                          const std::vector<real_t>& u)
+{
+    // T_t = 1 / (dU/dy)
+    std::vector<real_t> T_t(y.size());
+    for (size_t i = 1; i < y.size() - 1; ++i)
+    {
+        const real_t dU_dy = (u[i + 1] - u[i - 1]) / (y[i + 1] - y[i - 1]);
+        T_t[i] = 1.0 / std::abs(dU_dy);
+    }
+    T_t[0] = T_t[1];
+    T_t.back() = T_t[T_t.size() - 2];
+    return T_t;
+}
+
+
+std::vector<real_t> mixingLengthTKE(const std::vector<real_t>& y,
+const std::vector<real_t>& T_t, const std::function<real_t(real_t)>& mixingLength)
+{
+    std::vector<real_t> TKE(y.size());
+    for (size_t i = 1; i < y.size() - 1; ++i)
+    {
+        TKE[i] = 0.5 * std::pow(mixingLength(y[i]) / T_t[i], 2);
+    }
+    TKE[0] = TKE[1];
+    TKE.back() = TKE[TKE.size() - 2];
+    return TKE;
+}
+
+
+ContinuousPhase::ContinuousPhase(const Mesh& mesh, size_t samplePoints,
+    const std::function<real_t(real_t)>& mixingLength
+)
     : m_ResamplePoints(samplePoints)
     , m_ResampleDeltaY(mesh.height() / (samplePoints - 1))
     , m_Height(linspace(0.0, mesh.height(), samplePoints))
     , m_ResampledVel(resampleVelocity(mesh, samplePoints))
-    , m_ResampledTimeScale(std::vector<real_t>(samplePoints, 0.0))  // TODO
+    , m_ResampledTimeScale(mixingLengthTimeScale(m_Height, m_ResampledVel))
+    , m_ResampledTKE(mixingLengthTKE(m_Height, m_ResampledTimeScale, mixingLength))
 {
 }
 
@@ -191,11 +226,16 @@ ContinuousPhase::ContinuousPhase(const Mesh& mesh, size_t samplePoints)
 Vec3 ContinuousPhase::operator()(Particle& p, real_t dt) const noexcept
 {
     const size_t idx = std::clamp(static_cast<size_t>(p.pos.y / m_ResampleDeltaY), size_t(0), m_ResamplePoints - 1);
-
-    const real_t sigma_uprime = 0.0;  // TODO - Find this and add it here
     const real_t Tl = m_ResampledTimeScale[idx];
-    p.uprime = p.uprime * std::exp(-dt/Tl) + Vec3::null() * sigma_uprime * std::sqrt(1.0 - std::exp(-2.0*dt/Tl));
+    
+    static std::mt19937 gen(std::random_device{}());
+    static std::normal_distribution<real_t> ndist(0.0, 1.0);
 
+    p.uprime = p.uprime * std::exp(-dt / Tl) 
+             + Vec3(ndist(gen), ndist(gen), ndist(gen))    // random normal distribution
+             * std::sqrt(2.0 / 3.0 * m_ResampledTKE[idx])  // sigma_uprime
+             * std::sqrt(1.0 - std::exp(-2.0 * dt / Tl));
+    
     return Vec3(m_ResampledVel[idx], 0.0, 0.0) + p.uprime;
 }
 
