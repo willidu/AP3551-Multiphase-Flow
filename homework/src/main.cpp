@@ -20,4 +20,7 @@ int main()
     // Test for Task 5
     CMF::singleParticleTracking();
     CMF::multipleParticleTracking();
+
+    // Test for Task 6
+    CMF::testResampling();
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core.hpp"
+#include "steady_single_phase.hpp"
 #include "vector.hpp"
 
 #include <filesystem>
@@ -24,21 +25,22 @@ namespace CMF
 //     (ii) perfectly absorbing walls.
 // ****************************************************************************
 
-/**
- * The velocity field for the continuous phase is given as a continuous function
- * of position.
- */
-using ContinuousPhaseVelocity = std::function<Vec3(const Vec3&)>;
-
-
 struct Particle
 {
-    Vec3 pos;
-    Vec3 vel;
-    real_t density;
-    real_t radius;
+    Vec3 pos;        // [m]      Position
+    Vec3 vel;        // [m/s]    Total velocity
+    Vec3 uprime;     // [m/s]    Velocity fluctuation
+    real_t density;  // [kg/m^3] Particle density
+    real_t radius;   // [m]      Radius or effective radius
     bool onWall = false;
 };  // struct Particle
+
+
+/**
+ * The velocity field for the continuous phase is given as a continuous function
+ * of particle position.
+ */
+using ContinuousPhaseVelocity = std::function<Vec3(Particle&)>;
 
 
 struct Boundary
@@ -72,5 +74,66 @@ void particleTracking(
     real_t dt,
     std::filesystem::path output
 );
+
+
+// ****************************************************************************
+//                                 TASK 6
+// ****************************************************************************
+// Develop a routine to compute the “RANS turbulence” (characteristic velocity,
+// time-scale, length-scale and acceleration) at the position of a particle
+// with a known trajectory and velocity (i.e., the “turbulence seen by the
+// particle”). The particle moves in a 3D channel with a known fully-developed
+// turbulent flow (i.e., the mean velocity field is a known function of the
+// distance to the wall and of the time), and periodic boundary conditions in
+// the two directions parallel to the walls.
+//
+// Consider two possible types of models:
+//     (i)  a discrete-eddy model, and
+//     (ii) a Langevin model.
+// 
+// For the continuous-phase use the models developed in the previous tasks (i.e.,
+// an eddy-viscosity Prandtl mixing-length model and/or a k-epsilon model).
+// ****************************************************************************
+
+/**
+ * @brief Data class for the continuous phase.
+ * 
+ * This class takes in the result from a single-phase simulation and prepares
+ * the data for patricle tracking. The discrete results are interpolated, then
+ * resampled for fast runtime lookup.
+ * 
+ * @note Turbulence for the dispersed phase is added using a Langevin model.
+ * 
+ */
+class ContinuousPhase
+{
+public:
+    ContinuousPhase(const Mesh& mesh, size_t samplePoints);
+
+    /**
+     * @brief Get the velocity field at the position of a point particle.
+     * 
+     * @param pos Particle position
+     * @returns Vec3 Velocity field including turbulent fluctuations.
+     */
+    Vec3 operator()(Particle&, real_t dt) const noexcept;
+
+    inline std::pair<std::vector<real_t>, std::vector<real_t>> getSolution() const
+    {
+        return {m_Height, m_ResampledVel};
+    }
+
+    void plotInterpoaltedData() const;
+
+private:
+    const size_t m_ResamplePoints;
+    const real_t m_ResampleDeltaY;
+    const std::vector<real_t> m_Height;
+    const std::vector<real_t> m_ResampledVel;
+    const std::vector<real_t> m_ResampledTimeScale;
+    // const std::vector<real_t> m_ResampledTKE;
+    // const std::vector<real_t> m_ResampledDissipation;
+
+};  // class ContinuousPhase
 
 }  // namespace CMF

@@ -18,4 +18,7 @@ void unsteadyMixingLengthWallFunction();
 void singleParticleTracking();
 void multipleParticleTracking();
 
+// Task 6
+void testResampling();
+
 }  // namespace CMF

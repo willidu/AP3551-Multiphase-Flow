@@ -11,8 +11,8 @@ void singleParticleTracking()
     static const std::filesystem::path output {"single_particle_tracking.txt"};
     static constexpr size_t timesteps = 1000;
     static constexpr real_t dt = 0.01;
-    static const std::function<Vec3(const Vec3&)> velocityField
-        = [](const Vec3& pos) -> Vec3
+    static const ContinuousPhaseVelocity velocityField
+        = [](Particle&) -> Vec3
     {
         return Vec3(1.0, 0.0, 0.0); // Uniform velocity field in x direction
     };
@@ -55,12 +55,12 @@ void multipleParticleTracking()
         .collisionType = Boundary::CollisionType::ABSORB
     };
 
-    static const std::function<Vec3(const Vec3&)> velocityField
-        = [=](const Vec3& pos) -> Vec3
+    static const ContinuousPhaseVelocity velocityField
+        = [=](Particle& p) -> Vec3
     {
         // Parabolic profile
         return Vec3(
-            (pos.y * boundary.height - pos.y * pos.y) / (boundary.height * boundary.height),
+            (p.pos.y * boundary.height - p.pos.y * p.pos.y) / (boundary.height * boundary.height),
             0.0, 0.0);
     };
 
