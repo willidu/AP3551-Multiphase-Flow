@@ -7,21 +7,14 @@ namespace CMF
 
 void handleReflectiveBoundary(Particle& particle, const Boundary& boundary)
 {
+    const bool hitUpper = (particle.pos.y + particle.radius > boundary.height);
+    const bool hitLower = (particle.pos.y - particle.radius < 0);
 
-    // Reflective boundary condition
-    // TODO - Remove branching
-    if (particle.pos.y + particle.radius > boundary.height)
-    {
-        particle.onWall = true;
-        particle.pos.y = 2 * (boundary.height - particle.radius) - particle.pos.y;
-        particle.vel.y *= -1;
-    }
-    else if (particle.pos.y - particle.radius < 0)
-    {
-        particle.onWall = true;
-        particle.pos.y = 2 * particle.radius - particle.pos.y;
-        particle.vel.y *= -1;
-    }
+    particle.onWall = hitUpper || hitLower;
+    particle.vel.y *= (1.0 - 2.0 * (hitUpper || hitLower));
+    particle.pos.y = (1.0 - hitUpper) * (1.0 - hitLower) * particle.pos.y
+                   + hitUpper * (2 * (boundary.height - particle.radius) - particle.pos.y)
+                   + hitLower * (2 * particle.radius - particle.pos.y);
 }
 
 
@@ -30,20 +23,15 @@ void handleAbsorbingBoundary(
     const Boundary& boundary
 )
 {
-    // Absorbing boundary condition
-    // TODO - Remove branching
-    if (particle.pos.y + particle.radius > boundary.height)
-    {
-        particle.onWall = true;
-        particle.pos.y = boundary.height - particle.radius;
-        particle.vel = Vec3::null();
-    }
-    else if (particle.pos.y - particle.radius < 0)
-    {
-        particle.onWall = true;
-        particle.pos.y = particle.radius;
-        particle.vel = Vec3::null();
-    }
+    const bool hit = (particle.pos.y + particle.radius > boundary.height) ||
+                     (particle.pos.y - particle.radius < 0);
+
+    particle.onWall |= hit;  // Permanently set onWall if hit
+    particle.vel *= (1.0 - hit);
+    particle.pos.y = (1.0 - hit) * particle.pos.y + hit * std::max(
+        particle.radius,
+        std::min(particle.pos.y, boundary.height - particle.radius)
+    );
 }
 
 
