@@ -35,7 +35,8 @@ project "Homework"
     }
 
     filter "system:linux"
-        linkoptions { "-Wl,-rpath,'$$ORIGIN/lib'" }
+        buildoptions { "-fopenmp -fPIC"}
+        linkoptions { "-Wl,-rpath,'$$ORIGIN/lib' -fopenmp" }
 
     filter "configurations:Debug"
         symbols "On"

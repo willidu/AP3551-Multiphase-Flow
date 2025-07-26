@@ -75,6 +75,7 @@ private:
 
 std::vector<real_t> channelMesh1D(size_t N, real_t H, real_t s = 1.0);
 
+std::vector<real_t> linspace(real_t start, real_t end, size_t num_points);
 std::vector<real_t> logspace(real_t start, real_t end, size_t num_points);
 
 /**

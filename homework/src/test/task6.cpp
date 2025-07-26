@@ -26,12 +26,13 @@ static const std::function<real_t(real_t)> mixingLength = [H](real_t y) -> real_
     return std::min(kappa * std::min(y, H - y), kappa * 0.2 * delta);
 };
 
-static constexpr size_t timesteps = 1000;
+static constexpr size_t timesteps = 10'000;
 static constexpr real_t dt = 0.01;
 
 static const Boundary boundary {
-    .length = 40*H,
     .height = H,
+    .length = 40*H,
+    .width = 40*H,
     .collisionType = Boundary::CollisionType::ABSORB
 };
 
@@ -116,8 +117,7 @@ void testTurbulentParticleTracking()
     std::vector<Particle> particles = {Particle{
         .pos = Vec3(0.0, 0.5*boundary.height, 0.0),
         .vel = Vec3(1.0, 0.0, 0.0),
-        .density = 1e3,
-        .radius = 1e-3}
+        .timeConstant = 1.0}
     };
     
     particleTracking(particles, velocityField, 1e-5, boundary, timesteps, dt, output);
@@ -163,12 +163,12 @@ void testTurbulentManyParticleTracking()
     std::uniform_real_distribution<real_t> yDis(0.0, H);
     std::uniform_real_distribution<real_t> velXDis(0.0, 0.2);
 
-    for (size_t i = 0; i < 200; ++i)
+    for (size_t i = 0; i < 100; ++i)
     {
         particles.emplace_back(Particle{
             .pos = Vec3(0.0, yDis(gen), 0.0),
             .vel = Vec3(velXDis(gen), 0.0, 0.0),
-            .density = 1e3,
+            .timeConstant = 1.0 / particleRelaxationTime(1e-3, 1e3, 1e-3),
             .radius = 1e-3
         });
     }

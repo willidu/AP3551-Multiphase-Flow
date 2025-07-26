@@ -1,5 +1,6 @@
 #include "core.hpp"
 #include "test.hpp"
+#include "project.hpp"
 
 int main()
 {
@@ -7,7 +8,7 @@ int main()
     LOG_TRACE("Program started!");
 
     // Test for Task 1
-    CMF::givenDP_givenWallVel();
+    // CMF::givenDP_givenWallVel();
 
     // Test for Task 2 and 3 (also includes wall functions)
     CMF::testMixingLength();
@@ -18,11 +19,13 @@ int main()
     // CMF::unsteadyMixingLengthWallFunction();
 
     // Test for Task 5
-    CMF::singleParticleTracking();
-    CMF::multipleParticleTracking();
+    // CMF::singleParticleTracking();
+    // CMF::multipleParticleTracking();
 
     // Test for Task 6
-    CMF::testResampling();
-    CMF::testTurbulentParticleTracking();
-    CMF::testTurbulentManyParticleTracking();
+    // CMF::testResampling();
+    // CMF::testTurbulentParticleTracking();
+    // CMF::testTurbulentManyParticleTracking();
+
+    // Project::simulate();
 }

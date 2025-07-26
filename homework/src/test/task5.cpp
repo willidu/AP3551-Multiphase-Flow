@@ -18,19 +18,22 @@ void singleParticleTracking()
     };
 
     static const Boundary boundary {
-        .length = 3.0,
         .height = 1.0,
+        .length = 3.0,
+        .width = 3.0,
         .collisionType = Boundary::CollisionType::ABSORB
     };
 
     std::vector<Particle> particles = {Particle{
         .pos = Vec3(0.0, 0.5*boundary.height, 0.0),
         .vel = Vec3(0.0, 0.5, 0.0),
-        .density = 1e3,
+        .timeConstant = 1.0 / particleRelaxationTime(1e-3, 1e3, 1e-3),
         .radius = 1e-3}
     };
 
     particleTracking(particles, velocityField, 1e-5, boundary, timesteps, dt, output);
+
+    LOG_INFO("Final vx: {0:.4f}", particles[0].vel.x);
 }
 
 
@@ -50,8 +53,9 @@ void multipleParticleTracking()
     static constexpr real_t dt = 0.01;
     static constexpr size_t numParticles = 200;
     static const Boundary boundary {
-        .length = 10.0,
         .height = 1.0,
+        .length = 10.0,
+        .width = 10.0,
         .collisionType = Boundary::CollisionType::ABSORB
     };
 
@@ -71,7 +75,7 @@ void multipleParticleTracking()
         particles.push_back(Particle{
             .pos = Vec3(0.01*boundary.length, y, 0.0),
             .vel = Vec3(1.0, 0.0, 0.0),
-            .density = 1e3,
+            .timeConstant = 1.0 / particleRelaxationTime(1e-3, 1e3, 1e-3),
             .radius = 1e-3}
         );
     }

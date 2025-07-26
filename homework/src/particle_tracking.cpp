@@ -1,6 +1,7 @@
 #include "particle_tracking.hpp"
 
 #include <random>
+#include <omp.h>
 
 namespace CMF
 {
@@ -85,21 +86,30 @@ void particleTracking(
 
     for (size_t t = 0; t < timesteps; ++t)
     {
+        static int lastPercentage = -1;
+        int currentPercentage = static_cast<int>(100.0 * t / timesteps);
+        if (currentPercentage > lastPercentage)
+        {
+            lastPercentage = currentPercentage;
+            LOG_TRACE("Progress: {}%", currentPercentage);
+        }
+
         outputStream << "step\t" << t << "\n";
 
         for (Particle& particle : particles)
         {
             // Assume that the velocity field calculation handles all calculations
             // for the velocity fluctuations (uprime).
-            const Vec3 acceleration = (velocityField(particle) - particle.vel)
-                                    * 18.0 * M_PI * continuousPhaseViscosity
-                                    / (particle.density * particle.radius * particle.radius)
-                                    * (1.0 - particle.onWall);
-            particle.vel += acceleration * dt;
+            particle.vel += (velocityField(particle) - particle.vel)
+                            * particle.timeConstant * dt
+                            * (1.0 - particle.onWall);
             particle.pos += particle.vel * dt;
 
             // Lengthwise periodic boundary conditions
             particle.pos.x -= boundary.length * std::floor(particle.pos.x / boundary.length);
+
+            // Spanwise periodic boundary conditions
+            particle.pos.z -= boundary.width * std::floor(particle.pos.z / boundary.width);
 
             // Handle the height boundary conditions
             handleHeightBoundary(particle, boundary);
@@ -156,18 +166,6 @@ std::vector<real_t> resampleVelocity(const Mesh& mesh, size_t samplePoints)
 }
 
 
-std::vector<real_t> linspace(real_t low, real_t high, size_t num)
-{
-    std::vector<real_t> result(num);
-    const real_t step = (high - low) / (num - 1);
-    for (size_t i = 0; i < num; ++i)
-    {
-        result[i] = low + i * step;
-    }
-    return result;
-}
-
-
 std::vector<real_t> mixingLengthTimeScale(const std::vector<real_t>& y,
                                           const std::vector<real_t>& u)
 {
@@ -180,6 +178,7 @@ std::vector<real_t> mixingLengthTimeScale(const std::vector<real_t>& y,
     }
     T_t[0] = T_t[1];
     T_t.back() = T_t[T_t.size() - 2];
+    LOG_WARN("Time step must be smaller than minimum T_t for stability: {0:.2e} s", *std::min_element(T_t.begin(), T_t.end()));
     return T_t;
 }
 

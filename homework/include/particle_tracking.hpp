@@ -27,13 +27,27 @@ namespace CMF
 
 struct Particle
 {
-    Vec3 pos;        // [m]      Position
-    Vec3 vel;        // [m/s]    Total velocity
-    Vec3 uprime;     // [m/s]    Velocity fluctuation
-    real_t density;  // [kg/m^3] Particle density
-    real_t radius;   // [m]      Radius or effective radius
+    Vec3 pos;            // [m]   Position
+    Vec3 vel;            // [m/s] Total velocity
+    Vec3 uprime;         // [m/s] Velocity fluctuation
+    real_t timeConstant; // [s]   Inverse of relaxation time, 1/Tp
+    real_t radius;       // [m]   Particle radius, used for wall interactions
     bool onWall = false;
 };  // struct Particle
+
+
+/**
+ * @brief Particle relaxation time Tp = D^2 * rho_p / (18 * mu)
+ * 
+ * @param D     [m]     Particle diameter
+ * @param rho_p [kg/m^3] Particle density
+ * @param mu    [Pa-s]  Dynamic viscosity of the continuous phase
+ */
+[[nodiscard]] inline constexpr
+real_t particleRelaxationTime(real_t D, real_t rho_p, real_t mu) noexcept
+{
+    return rho_p * D * D / ( 18.0 * M_PI * mu );
+}
 
 
 /**
@@ -47,8 +61,9 @@ struct Boundary
 {
     enum class CollisionType { REFLECT, ABSORB };
 
-    real_t length;
     real_t height;
+    real_t length;
+    real_t width;
     CollisionType collisionType;
 };  // struct Geometry
 
