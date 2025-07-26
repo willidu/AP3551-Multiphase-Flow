@@ -30,8 +30,8 @@ void testMixingLength()
     // ************************************************************************
     //                            Mesh generation
     // ************************************************************************
-    Mesh mesh = Mesh::ResolvedWallMesh(H, 51, molecularViscosity, 5.0);
-    Mesh mesh_2 = Mesh::ResolvedWallMesh(H, 201, molecularViscosity, 4.0);
+    Mesh mesh = Mesh::ResolvedWallMesh(H, 51, molecularViscosity, 3.0);
+    Mesh mesh_2 = Mesh::ResolvedWallMesh(H, 201, molecularViscosity, 2.0);
     Mesh mesh_3 = [=]()
     {
         static constexpr size_t Np = 101;

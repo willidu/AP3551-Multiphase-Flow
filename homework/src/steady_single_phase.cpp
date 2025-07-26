@@ -44,10 +44,10 @@ void fillSystem(
         const auto& S = mesh[i-1];  // South
 
         // Linear interpolation of viscosity at faces
-        const real_t mu_n = (1.0 - P.width / N.width) * P.viscosity
-                                 + P.width / N.width  * N.viscosity;
-        const real_t mu_s = (1.0 - P.width / S.width) * P.viscosity
-                                 + P.width / S.width  * S.viscosity;
+        const real_t mu_n = (1.0 - P.width / (P.width + N.width)) * P.viscosity
+                                 + P.width / (P.width + N.width)  * N.viscosity;
+        const real_t mu_s = (1.0 - P.width / (P.width + S.width)) * P.viscosity
+                                 + P.width / (P.width + S.width)  * S.viscosity;
 
         SM_ELEMENT_D(A, i, i + 1) = + mu_n * 2.0 / (P.width + N.width);
         SM_ELEMENT_D(A, i, i)     = - mu_n * 2.0 / (P.width + N.width)
@@ -64,9 +64,9 @@ void fillSystem(
             const auto& P = mesh[0];
             const auto& N = mesh[1];
 
-            const real_t mu_n = (1.0 - P.width / N.width) * P.viscosity
-                                     + P.width / N.width  * N.viscosity;
-            const real_t mu_s = P.viscosity; // TODO - Double check
+            const real_t mu_n = (1.0 - P.width / (P.width + N.width)) * P.viscosity
+                                     + P.width / (P.width + N.width)  * N.viscosity;
+            const real_t mu_s = P.viscosity;
 
             SM_ELEMENT_D(A, 0, 0) = + 2.0 * mu_n / (P.width + N.width)
                                     + 2.0 * mu_s / (P.width);
@@ -81,9 +81,9 @@ void fillSystem(
             const auto& P = mesh[0];
             const auto& N = mesh[1];
 
-            const real_t mu_n = (1.0 - P.width / N.width) * P.viscosity
-                                     + P.width / N.width  * N.viscosity;
-            const real_t mu_s = P.viscosity; // TODO - Double check
+            const real_t mu_n = (1.0 - P.width / (P.width + N.width)) * P.viscosity
+                                     + P.width / (P.width + N.width)  * N.viscosity;
+            const real_t mu_s = P.viscosity;
 
             SM_ELEMENT_D(A, 0, 0) = - 2.0 * mu_n / (P.width + N.width);
             SM_ELEMENT_D(A, 0, 1) = + 2.0 * mu_n / (P.width + N.width);
@@ -115,9 +115,9 @@ void fillSystem(
             const auto& P = mesh[N];
             const auto& S = mesh[N - 1];
 
-            const real_t mu_n = P.viscosity; // TODO - Double check
-            const real_t mu_s = (1.0 - P.width / S.width) * P.viscosity
-                                     + P.width / S.width  * S.viscosity;
+            const real_t mu_n = P.viscosity;
+            const real_t mu_s = (1.0 - P.width / (P.width + S.width)) * P.viscosity
+                                     + P.width / (P.width + S.width)  * S.viscosity;
 
             SM_ELEMENT_D(A, N, N)   = + 2.0 * mu_n / (P.width)
                                       + 2.0 * mu_s / (P.width + S.width);
@@ -133,9 +133,9 @@ void fillSystem(
             const auto& P = mesh[N];
             const auto& S = mesh[N - 1];
 
-            const real_t mu_n = P.viscosity; // TODO - Double check
-            const real_t mu_s = (1.0 - P.width / S.width) * P.viscosity
-                                     + P.width / S.width  * S.viscosity;
+            const real_t mu_n = P.viscosity;
+            const real_t mu_s = (1.0 - P.width / (P.width + S.width)) * P.viscosity
+                                     + P.width / (P.width + S.width)  * S.viscosity;
 
             SM_ELEMENT_D(A, N, N)   = - 2.0 * mu_n / (P.width + S.width);
             SM_ELEMENT_D(A, N, N-1) = + 2.0 * mu_s / (P.width + S.width);

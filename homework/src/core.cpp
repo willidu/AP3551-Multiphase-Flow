@@ -32,6 +32,22 @@ std::vector<real_t> channelMesh1D(size_t N, real_t H, real_t s)
 }
 
 
+std::vector<real_t> linspace(real_t start, real_t end, size_t num_points)
+{
+    std::vector<real_t> result;
+    result.reserve(num_points);
+
+    const real_t step = (end - start) / (num_points - 1);
+
+    for (size_t i = 0; i < num_points; ++i)
+    {
+        result.push_back(start + i * step);
+    }
+
+    return result;
+}
+
+
 std::vector<real_t> logspace(real_t start, real_t end, size_t num_points)
 {
     std::vector<real_t> result;
