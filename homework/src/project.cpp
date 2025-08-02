@@ -24,8 +24,8 @@ static const std::function<real_t(real_t)> mixingLength = [H](real_t y) -> real_
     return std::min(kappa * std::min(y, H - y), kappa * 0.2 * delta);
 };
 
-static constexpr size_t timesteps = 10'000;
-static constexpr real_t dt = 1e-5;
+static constexpr size_t timesteps = 200'000;
+static constexpr real_t dt = 2e-6;
 static constexpr size_t particleCount = 10'000;
 static constexpr size_t tracerCount = 2;
 static constexpr size_t binCount = 100;
@@ -42,7 +42,7 @@ static const Boundary boundary {
 
 const BC bc {
     {WallBC::Velocity, 0.0}, {WallBC::Velocity, 0.0},
-    {GlobalBC::PressureGradient, -0.5e3}
+    {GlobalBC::PressureGradient, -1e3}
 };
 
 static const real_t binWidth = boundary.length / binCount;  // TODO make constexpr
@@ -86,7 +86,7 @@ void simulate()
 
     Mesh mesh = [=]()
     {
-        static constexpr size_t Np = 1001;
+        static constexpr size_t Np = 201;
         const real_t wallDistance = 0.01 * H;  // Placement of first and last node from wall
         const real_t dy = (H - 4.0 * wallDistance) / (Np - 2.0);
         assert(dy > 0.0 && "Invalid width in mesh generation");
@@ -112,6 +112,24 @@ void simulate()
     ContinuousPhaseVelocity velocityField = [&gas, dt](Particle& p) -> Vec3 { return gas(p, dt); };
 
     LOG_INFO("Steady single-phase simulation done");
+
+    // Plot the continuous phase velocity field
+    auto [y1, u1] = mesh.getSolution();
+    auto [y2, u2] = gas.getSolution();
+
+    plt::figure();
+    plt::ylim(0.0, H);
+    plt::named_plot("Resampled", u2, y2, "k-");
+    plt::named_plot("Finite volume", u1, y1, "gx");
+    plt::xlabel("Velocity [m/s]");
+    plt::ylabel("Height [m]");
+    plt::title("Velocity profile");
+    plt::grid(true);
+    plt::legend();
+    plt::show();
+
+    LOG_INFO("Starting particle tracking");
+
     std::vector<Particle> particles;
     const std::vector<real_t> vx = gas.getSolution().second;
     auto vx_callable = [&vx](real_t y) -> real_t
@@ -234,20 +252,6 @@ void simulate()
 
         out.close();
     }
-
-    // Plot the continuous phase velocity field
-    auto [y1, u1] = mesh.getSolution();
-    auto [y2, u2] = gas.getSolution();
-
-    plt::figure();
-    plt::ylim(0.0, H);
-    plt::named_plot("Resampled", u2, y2, "k-");
-    plt::named_plot("Finite volume", u1, y1, "gx");
-    plt::xlabel("Velocity [m/s]");
-    plt::ylabel("Height [m]");
-    plt::title("Velocity profile");
-    plt::grid(true);
-    plt::legend();
 
     // Plot the time series of the first and last bin, and one in the middle
     std::vector<real_t> bin1, bin2, bin3;

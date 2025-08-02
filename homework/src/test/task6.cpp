@@ -16,7 +16,7 @@ static constexpr real_t molecularViscosity = 1e-3;
 
 constexpr BC bc {
     {WallBC::Velocity, 0.0}, {WallBC::Velocity, 0.0},
-    {GlobalBC::PressureGradient, -10.0}
+    {GlobalBC::PressureGradient, -1e3}
 };
 
 static const std::function<real_t(real_t)> mixingLength = [H](real_t y) -> real_t
@@ -69,7 +69,7 @@ void testResampling()
 
     plt::figure();
     plt::ylim(0.0, H);
-    plt::xlim(0.0, 0.5);
+    // plt::xlim(0.0, 0.5);
     plt::named_plot("Resampled", u2, y2, "k-");
     plt::named_plot("Finite volume", u1, y1, "gx");
     plt::xlabel("Velocity [m/s]");
